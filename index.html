@@ -1,0 +1,1208 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Руководство по самостоятельной сборке сетевого стенда: VLAN, маршрутизация, DHCP, DNS, NAT, публикация сервиса и фильтрация трафика.">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#0F6B4F">
+<style>html{color-scheme:light dark}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>Семь слоёв стенда</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@500;600;700;800&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=JetBrains+Mono:wght@400;600&display=swap">
+
+<style>
+:root{
+  --paper:#F6F7F4; --surface:#FFFFFF; --surface-2:#ECEFE9;
+  --ink:#171B1A; --ink-2:#525B57; --ink-3:#7C857F;
+  --rule:#D6DAD2; --rule-strong:#B9BFB6;
+  --accent:#0F6B4F; --accent-2:#0B5540; --accent-soft:#E1EEE8;
+  --warn:#8F5407; --warn-soft:#F7EEDD;
+  --danger:#8E2F27; --danger-soft:#F6E5E2;
+  --code-bg:#1A1F1E; --code-ink:#DFE7E2; --code-dim:#8FA097; --code-key:#8ECDA9;
+  --shadow:0 1px 2px rgba(23,27,26,.06), 0 8px 24px -16px rgba(23,27,26,.25);
+  --maxw:1200px;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#0F1413; --surface:#161B1A; --surface-2:#1D2422;
+    --ink:#E9EEEB; --ink-2:#A3ADA8; --ink-3:#7E8983;
+    --rule:#2A3230; --rule-strong:#3A4441;
+    --accent:#5CC79C; --accent-2:#7FD8B4; --accent-soft:#13312A;
+    --warn:#DFA65E; --warn-soft:#2C2415;
+    --danger:#E0928A; --danger-soft:#2E1F1D;
+    --code-bg:#0A0E0D; --code-ink:#D9E2DD; --code-dim:#78877F; --code-key:#7BC79E;
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 10px 30px -18px rgba(0,0,0,.8);
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#0F1413; --surface:#161B1A; --surface-2:#1D2422;
+  --ink:#E9EEEB; --ink-2:#A3ADA8; --ink-3:#7E8983;
+  --rule:#2A3230; --rule-strong:#3A4441;
+  --accent:#5CC79C; --accent-2:#7FD8B4; --accent-soft:#13312A;
+  --warn:#DFA65E; --warn-soft:#2C2415;
+  --danger:#E0928A; --danger-soft:#2E1F1D;
+  --code-bg:#0A0E0D; --code-ink:#D9E2DD; --code-dim:#78877F; --code-key:#7BC79E;
+  --shadow:0 1px 2px rgba(0,0,0,.4), 0 10px 30px -18px rgba(0,0,0,.8);
+}
+
+*{box-sizing:border-box}
+body{
+  margin:0; background:var(--paper); color:var(--ink);
+  font-family:"Source Serif 4","Georgia",serif; font-size:17px; line-height:1.62;
+  -webkit-font-smoothing:antialiased;
+}
+h1,h2,h3,h4,.ui{font-family:"Golos Text","Segoe UI",system-ui,sans-serif}
+code,kbd,pre,.mono{font-family:"JetBrains Mono","Consolas",monospace}
+
+/* ---------- shell ---------- */
+.topbar{
+  position:sticky; top:0; z-index:40; background:var(--paper);
+  border-bottom:1px solid var(--rule);
+}
+.topbar-in{
+  max-width:var(--maxw); margin:0 auto; padding:10px 24px;
+  display:flex; align-items:center; gap:18px; flex-wrap:wrap;
+}
+.brand{display:flex; align-items:baseline; gap:10px; margin-right:auto}
+.brand b{font-family:"Golos Text",sans-serif; font-weight:700; font-size:16px; letter-spacing:-.01em}
+.brand span{font-size:12.5px; color:var(--ink-3); font-family:"Golos Text",sans-serif}
+.tools{display:flex; gap:8px; flex-wrap:wrap}
+.tbtn{
+  font-family:"Golos Text",sans-serif; font-size:12.5px; font-weight:600;
+  border:1px solid var(--rule-strong); background:var(--surface); color:var(--ink-2);
+  padding:6px 11px; border-radius:3px; cursor:pointer; letter-spacing:.01em;
+}
+.tbtn:hover{border-color:var(--accent); color:var(--accent)}
+.tbtn[aria-pressed="true"]{background:var(--accent); border-color:var(--accent); color:var(--paper)}
+.tbtn:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+
+.wrap{max-width:var(--maxw); margin:0 auto; padding:0 24px 100px;
+  display:grid; grid-template-columns:232px minmax(0,1fr); gap:56px; align-items:start}
+@media(max-width:940px){ .wrap{grid-template-columns:1fr; gap:0} .rail{display:none} }
+
+.rail{position:sticky; top:60px; padding:28px 0; font-family:"Golos Text",sans-serif}
+.rail-h{font-size:11px; letter-spacing:.13em; text-transform:uppercase; color:var(--ink-3); margin:0 0 12px}
+.rail a{
+  display:flex; gap:9px; align-items:baseline; text-decoration:none; color:var(--ink-2);
+  font-size:13.5px; padding:4px 0; border-left:2px solid transparent; padding-left:11px; margin-left:-11px;
+}
+.rail a:hover{color:var(--accent)}
+.rail a.on{color:var(--ink); border-left-color:var(--accent); font-weight:600}
+.rail a i{font-style:normal; color:var(--ink-3); font-size:11.5px; min-width:16px; font-variant-numeric:tabular-nums}
+.rail-prog{margin-top:20px; padding-top:16px; border-top:1px solid var(--rule); font-size:12px; color:var(--ink-3)}
+.bar{height:4px; background:var(--surface-2); border-radius:2px; overflow:hidden; margin-top:7px}
+.bar i{display:block; height:100%; background:var(--accent); width:0%; transition:width .25s}
+
+main{padding:26px 0 0; min-width:0}
+
+/* ---------- hero ---------- */
+.hero{padding:14px 0 30px; border-bottom:1px solid var(--rule); margin-bottom:38px}
+.hero .eyebrow{font-family:"Golos Text",sans-serif; font-size:11.5px; letter-spacing:.15em;
+  text-transform:uppercase; color:var(--accent); font-weight:700}
+.hero h1{font-size:clamp(30px,4.4vw,46px); line-height:1.08; margin:.35em 0 .3em;
+  font-weight:800; letter-spacing:-.025em; text-wrap:balance; max-width:16ch}
+.hero p{margin:0; max-width:66ch; color:var(--ink-2); font-size:18px}
+.hero-facts{display:flex; gap:26px; flex-wrap:wrap; margin-top:26px;
+  font-family:"Golos Text",sans-serif; font-size:12.5px; color:var(--ink-3)}
+.hero-facts b{display:block; font-size:20px; color:var(--ink); font-weight:700;
+  font-variant-numeric:tabular-nums; letter-spacing:-.01em}
+
+/* ---------- sections ---------- */
+section{margin:0 0 62px; scroll-margin-top:66px}
+.sec-h{display:flex; align-items:baseline; gap:12px; margin:0 0 6px}
+.sec-n{font-family:"Golos Text",sans-serif; font-size:12px; font-weight:700; color:var(--accent);
+  letter-spacing:.08em; font-variant-numeric:tabular-nums; padding-top:4px}
+h2{font-size:clamp(23px,2.6vw,30px); font-weight:700; letter-spacing:-.02em; margin:0;
+  line-height:1.18; text-wrap:balance}
+.sec-lede{color:var(--ink-2); max-width:68ch; margin:8px 0 26px}
+h3{font-size:18.5px; font-weight:700; margin:34px 0 10px; letter-spacing:-.01em; text-wrap:balance}
+h4{font-size:15px; font-weight:600; margin:22px 0 8px; color:var(--ink-2);
+  font-family:"Golos Text",sans-serif; letter-spacing:.005em}
+p{max-width:68ch; margin:0 0 14px}
+ul,ol{max-width:68ch; padding-left:20px; margin:0 0 16px}
+li{margin:0 0 7px}
+strong{font-weight:600}
+a{color:var(--accent); text-decoration-thickness:1px; text-underline-offset:2px}
+hr.soft{border:0; border-top:1px solid var(--rule); margin:34px 0}
+
+/* ---------- role blocks ---------- */
+.def{border-left:3px solid var(--accent); background:var(--accent-soft);
+  padding:14px 18px; margin:0 0 18px; max-width:68ch; border-radius:0 3px 3px 0}
+.def .t{font-family:"Golos Text",sans-serif; font-weight:700; font-size:13px;
+  letter-spacing:.02em; color:var(--accent-2); margin-bottom:4px}
+.def p{margin:0; max-width:none}
+.def .fr{display:block; margin-top:7px; font-size:13.5px; color:var(--ink-2);
+  font-family:"Golos Text",sans-serif}
+
+.trap{border-left:3px solid var(--warn); background:var(--warn-soft);
+  padding:14px 18px; margin:0 0 18px; max-width:68ch; border-radius:0 3px 3px 0}
+.trap .t{font-family:"Golos Text",sans-serif; font-weight:700; font-size:12px;
+  letter-spacing:.09em; text-transform:uppercase; color:var(--warn); margin-bottom:5px}
+.trap p{margin:0 0 8px; max-width:none}
+.trap p:last-child{margin:0}
+
+.gate{border:1px solid var(--accent); border-left-width:3px; background:var(--surface);
+  padding:14px 18px; margin:20px 0; max-width:68ch; border-radius:0 3px 3px 0}
+.gate .t{font-family:"Golos Text",sans-serif; font-weight:700; font-size:12px;
+  letter-spacing:.09em; text-transform:uppercase; color:var(--accent-2); margin-bottom:9px}
+.gate label{display:flex; gap:10px; align-items:flex-start; font-size:15.5px;
+  margin:0 0 7px; cursor:pointer; line-height:1.45}
+.gate input{margin:5px 0 0; accent-color:var(--accent); width:15px; height:15px; flex:none}
+.gate input:checked + span{color:var(--ink-3); text-decoration:line-through}
+.gate .why{font-size:13.5px; color:var(--ink-2); margin:9px 0 0; font-family:"Golos Text",sans-serif}
+
+/* ---------- code ---------- */
+.cmd{margin:0 0 18px}
+.cmd-h{display:flex; align-items:center; gap:10px; margin-bottom:6px;
+  font-family:"Golos Text",sans-serif; font-size:12px; color:var(--ink-3); letter-spacing:.05em;
+  text-transform:uppercase; font-weight:600}
+.cmd-h .where{color:var(--accent); font-weight:700}
+pre{margin:0; background:var(--code-bg); color:var(--code-ink); padding:15px 17px;
+  border-radius:4px; overflow-x:auto; font-size:13.2px; line-height:1.62; tab-size:2}
+pre .c{color:var(--code-dim)}
+pre .k{color:var(--code-key)}
+code{background:var(--surface-2); padding:.1em .35em; border-radius:3px; font-size:.88em}
+.cmd-note{font-size:14px; color:var(--ink-2); margin:8px 0 0; max-width:68ch}
+body.hide-cmd .cmd pre{display:none}
+body.hide-cmd .cmd::after{
+  content:"команды скрыты — восстанови по памяти, потом сними режим";
+  display:block; font-family:"Golos Text",sans-serif; font-size:13px; color:var(--ink-3);
+  border:1px dashed var(--rule-strong); border-radius:4px; padding:11px 15px; background:var(--surface);
+}
+
+/* ---------- tables ---------- */
+.tw{overflow-x:auto; margin:0 0 20px; border:1px solid var(--rule); border-radius:4px; background:var(--surface)}
+table{border-collapse:collapse; width:100%; font-size:14.5px; min-width:520px}
+th,td{text-align:left; padding:9px 13px; border-bottom:1px solid var(--rule); vertical-align:top}
+th{font-family:"Golos Text",sans-serif; font-size:11.5px; text-transform:uppercase;
+  letter-spacing:.07em; color:var(--ink-3); font-weight:700; background:var(--surface-2)}
+tr:last-child td{border-bottom:0}
+td.mono,th.mono{font-family:"JetBrains Mono",monospace; font-size:13px; white-space:nowrap}
+td b{font-weight:600}
+
+/* ---------- layers ---------- */
+.layers{counter-reset:l; margin:0 0 22px; max-width:68ch}
+.layer{display:grid; grid-template-columns:34px 1fr; gap:14px; padding:13px 0;
+  border-bottom:1px solid var(--rule)}
+.layer:last-child{border-bottom:0}
+.layer .n{counter-increment:l; font-family:"Golos Text",sans-serif; font-weight:800;
+  font-size:13px; color:var(--paper); background:var(--accent); width:26px; height:26px;
+  border-radius:50%; display:grid; place-items:center; font-variant-numeric:tabular-nums}
+.layer .n::before{content:counter(l)}
+.layer h4{margin:2px 0 3px; color:var(--ink); font-size:15.5px; font-weight:700}
+.layer p{margin:0; font-size:15px; color:var(--ink-2)}
+.layer .chk{font-family:"JetBrains Mono",monospace; font-size:12.5px; color:var(--accent-2);
+  margin-top:6px; display:block}
+
+/* ---------- day plan ---------- */
+.day{border:1px solid var(--rule); border-radius:4px; background:var(--surface);
+  margin:0 0 18px; overflow:hidden}
+.day-h{display:flex; align-items:baseline; gap:12px; padding:13px 18px;
+  background:var(--surface-2); border-bottom:1px solid var(--rule)}
+.day-h b{font-family:"Golos Text",sans-serif; font-size:15px; font-weight:700}
+.day-h span{font-family:"Golos Text",sans-serif; font-size:12.5px; color:var(--ink-3); margin-left:auto;
+  font-variant-numeric:tabular-nums}
+.slot{display:grid; grid-template-columns:78px 1fr; gap:16px; padding:12px 18px;
+  border-bottom:1px solid var(--rule)}
+.slot:last-child{border-bottom:0}
+.slot .t{font-family:"JetBrains Mono",monospace; font-size:12.5px; color:var(--accent-2);
+  font-variant-numeric:tabular-nums; padding-top:2px}
+.slot h4{margin:0 0 3px; font-size:15px; color:var(--ink); font-weight:700}
+.slot p{margin:0; font-size:14.5px; color:var(--ink-2); max-width:none}
+
+/* ---------- flashcards ---------- */
+.cards{display:grid; gap:9px; margin:0 0 18px}
+details.card{border:1px solid var(--rule); border-radius:4px; background:var(--surface); overflow:hidden}
+details.card summary{padding:11px 16px; cursor:pointer; font-family:"Golos Text",sans-serif;
+  font-size:15px; font-weight:600; list-style:none; display:flex; gap:10px; align-items:baseline}
+details.card summary::-webkit-details-marker{display:none}
+details.card summary::before{content:"?"; color:var(--accent); font-weight:800; font-size:13px; flex:none}
+details.card[open] summary::before{content:"—"}
+details.card summary:hover{color:var(--accent)}
+details.card summary:focus-visible{outline:2px solid var(--accent); outline-offset:-2px}
+details.card .a{padding:0 16px 14px 32px; font-size:15.5px; color:var(--ink-2); border-top:1px solid var(--rule); padding-top:12px}
+details.card .a p{margin:0 0 9px; max-width:none}
+details.card .a p:last-child{margin:0}
+details.card .a code{font-size:.9em}
+
+/* ---------- drills ---------- */
+.drill{border:1px solid var(--rule); border-left:3px solid var(--danger); border-radius:0 4px 4px 0;
+  background:var(--surface); padding:13px 17px; margin:0 0 10px}
+.drill .t{font-family:"Golos Text",sans-serif; font-weight:700; font-size:15px; margin-bottom:4px}
+.drill .s{font-size:14.5px; color:var(--ink-2); margin:0 0 6px; max-width:none}
+.drill details summary{font-family:"Golos Text",sans-serif; font-size:13px; color:var(--accent);
+  cursor:pointer; font-weight:600}
+.drill details summary:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+.drill details p{font-size:14.5px; color:var(--ink-2); margin:8px 0 0; max-width:none}
+
+.kv{display:grid; grid-template-columns:auto 1fr; gap:6px 16px; margin:0 0 18px;
+  font-size:15px; max-width:68ch}
+.kv dt{font-family:"Golos Text",sans-serif; font-weight:600; color:var(--ink-2); font-size:14px}
+.kv dd{margin:0}
+
+.note{font-size:14.5px; color:var(--ink-2); border-top:1px solid var(--rule);
+  padding-top:12px; margin-top:20px; max-width:68ch}
+footer{border-top:1px solid var(--rule); margin-top:60px; padding:22px 0 0;
+  font-family:"Golos Text",sans-serif; font-size:13px; color:var(--ink-3); max-width:68ch}
+
+@media (prefers-reduced-motion: reduce){*{transition:none!important; animation:none!important}}
+</style>
+
+</head>
+<body>
+<div class="topbar">
+  <div class="topbar-in">
+    <div class="brand">
+      <b>Семь слоёв стенда</b>
+      <span>руководство по сборке сети от нуля до сдачи</span>
+    </div>
+    <div class="tools">
+      <button class="tbtn" id="hideBtn" aria-pressed="false">Скрыть команды</button>
+      <button class="tbtn" id="resetBtn">Сбросить отметки</button>
+    </div>
+  </div>
+</div>
+
+<div class="wrap">
+  <nav class="rail ui" aria-label="Разделы">
+    <p class="rail-h">Разделы</p>
+    <a href="#m0"><i>0</i>Как учиться</a>
+    <a href="#m1"><i>1</i>Фундамент</a>
+    <a href="#m2"><i>2</i>Семь слоёв</a>
+    <a href="#m3"><i>3</i>Runbook</a>
+    <a href="#m4"><i>4</i>Диагностика</a>
+    <a href="#m5"><i>5</i>Ловушки</a>
+    <a href="#m6"><i>6</i>Тренажёр поломок</a>
+    <a href="#m7"><i>7</i>Вариации</a>
+    <a href="#m8"><i>8</i>Документация</a>
+    <a href="#m9"><i>9</i>Карточки</a>
+    <a href="#m10"><i>10</i>Экзамен</a>
+    <div class="rail-prog">
+      <span id="progTxt">Отмечено 0 из 0</span>
+      <div class="bar"><i id="progBar"></i></div>
+    </div>
+  </nav>
+
+  <main>
+    <div class="hero">
+      <div class="eyebrow">Руководство · сети · сборка и сдача</div>
+      <h1>Семь слоёв стенда</h1>
+      <p>Как собрать сегментированную сеть с нуля, понимая каждое действие: VLAN и маршрутизация, адресация и имена, выход в интернет, публикация сервиса и ограничение доступа. Принципы вендоронезависимы, примеры даны на конкретном железе и помечены как примеры.</p>
+      <div class="hero-facts">
+        <div><b>7</b>слоёв сборки</div>
+        <div><b>3</b>дня по регламенту</div>
+        <div><b>18</b>тренировочных поломок</div>
+        <div><b>60</b>карточек самопроверки</div>
+      </div>
+    </div>
+
+    <!-- ============ 0 ============ -->
+    <section id="m0">
+      <div class="sec-h"><span class="sec-n">00</span><h2>Как этим пользоваться, чтобы осталось в голове</h2></div>
+      <p class="sec-lede">Читать руководство бесполезно. Знание закрепляется только тогда, когда ты извлекаешь его из памяти под сопротивление, а не узнаёшь на странице.</p>
+
+      <h3>Три прохода</h3>
+      <p>Один и тот же стенд собирается трижды, и каждый раз опора убирается.</p>
+      <ol>
+        <li><strong>С подсказками.</strong> Идёшь по разделу 3, команды перед глазами. Задача — не скорость, а понимание каждой строки. После каждого блока читаешь «почему так» и проходишь контрольную проверку.</li>
+        <li><strong>По чек-листу.</strong> Нажимаешь «Скрыть команды» вверху страницы. Остаются только названия шагов и контрольные проверки. Команды достаёшь из памяти, подглядываешь только когда встал совсем.</li>
+        <li><strong>С чистого листа.</strong> Стенд сброшен, руководство закрыто. Собираешь по памяти, засекая время. Всё, где споткнулся, идёт в журнал ошибок из раздела 10.</li>
+      </ol>
+
+      <h3>Дневной цикл</h3>
+      <p>Схема, которая работает лучше долгих сессий: короткие блоки с обязательным извлечением из памяти.</p>
+      <div class="tw"><table>
+        <thead><tr><th>Время</th><th>Что делаешь</th><th>Зачем</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">15 мин</td><td>Карточки по вчерашнему</td><td>Извлечение из памяти, а не перечитывание</td></tr>
+          <tr><td class="mono">30 мин</td><td>Новая теория</td><td>Один блок, не больше</td></tr>
+          <tr><td class="mono">30 мин</td><td>Лаборатория по этой же теории</td><td>Руки закрепляют то, что понял головой</td></tr>
+          <tr><td class="mono">15 мин</td><td>Самопроверка без подсказок</td><td>Находит дыры, которые кажутся закрытыми</td></tr>
+          <tr><td class="mono">10 мин</td><td>Разбор своих ошибок</td><td>Личный список слабых мест ценнее любого гида</td></tr>
+        </tbody>
+      </table></div>
+
+      <h3>Повторение с изменённым условием</h3>
+      <p>Пересобрать тот же стенд второй раз даёт мало: ты вспоминаешь последовательность, а не принцип. Работает возврат к той же лабе с подменённым условием — другая маска, лишний VLAN, другое правило доступа. Момент, когда заученное не подходит и приходится думать, и есть момент обучения. Пять таких сценариев лежат в разделе 7.</p>
+
+      <div class="trap">
+        <div class="t">Главная ошибка самоподготовки</div>
+        <p>Собрать стенд один раз, увидеть, что всё работает, и решить, что тема закрыта. Через две недели ты не вспомнишь, зачем нужен <code>ip routing</code>, потому что ни разу не сталкивался с ситуацией, когда его нет. Отсюда раздел 6: ломать надо намеренно.</p>
+      </div>
+    </section>
+
+    <!-- ============ 1 ============ -->
+    <section id="m1">
+      <div class="sec-h"><span class="sec-n">01</span><h2>Фундамент</h2></div>
+      <p class="sec-lede">Понятия, из которых выводится всё остальное. Если хоть одно из них размыто, диагностика превращается в перебор наугад.</p>
+
+      <h3>Кадр, пакет и два адреса</h3>
+      <p>В сети одновременно живут два адреса, и путать их — источник половины ошибок новичка.</p>
+      <div class="def">
+        <div class="t">MAC-адрес</div>
+        <p>Адрес сетевой карты, работает только внутри одного сегмента. Коммутатор смотрит именно на него. За пределы сегмента не выходит: на каждом маршрутизаторе MAC переписывается.</p>
+        <span class="fr">fr — adresse MAC</span>
+      </div>
+      <div class="def">
+        <div class="t">IP-адрес</div>
+        <p>Адрес узла в масштабе всей сети, сохраняется от отправителя до получателя. Маршрутизатор смотрит на него, чтобы выбрать, куда отправить пакет дальше.</p>
+        <span class="fr">fr — adresse IP</span>
+      </div>
+      <p>Единица передачи на канальном уровне — <strong>кадр</strong> (fr: trame), внутри него едет <strong>пакет</strong> (fr: paquet). Коммутатор оперирует кадрами, маршрутизатор — пакетами. Отсюда простое следствие: если два узла в одном сегменте не видят друг друга, маршрутизация тут ни при чём, проблема на уровне коммутации.</p>
+
+      <div class="def">
+        <div class="t">Широковещательный домен</div>
+        <p>Множество узлов, до которых доходит широковещательный кадр — тот, что адресован «всем». Внутри домена работает ARP, DHCP-запрос и обнаружение соседей. Один коммутатор без VLAN — это один широковещательный домен: все всех слышат.</p>
+        <span class="fr">fr — domaine de diffusion</span>
+      </div>
+
+      <h3>Маска и почему сеть — это диапазон</h3>
+      <p>Маска делит адрес на две части: какая сеть и какой узел внутри неё. Запись <code>/24</code> означает, что первые 24 бита из 32 — номер сети, оставшиеся 8 — номера узлов.</p>
+      <div class="tw"><table>
+        <thead><tr><th>Префикс</th><th>Маска</th><th>Всего адресов</th><th>Пригодных</th><th>Когда применяют</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">/24</td><td class="mono">255.255.255.0</td><td class="mono">256</td><td class="mono">254</td><td>Пользовательская сеть</td></tr>
+          <tr><td class="mono">/28</td><td class="mono">255.255.255.240</td><td class="mono">16</td><td class="mono">14</td><td>Небольшой служебный сегмент</td></tr>
+          <tr><td class="mono">/29</td><td class="mono">255.255.255.248</td><td class="mono">8</td><td class="mono">6</td><td>Пара серверов, транзитный линк</td></tr>
+          <tr><td class="mono">/30</td><td class="mono">255.255.255.252</td><td class="mono">4</td><td class="mono">2</td><td>Точка-точка между двумя устройствами</td></tr>
+        </tbody>
+      </table></div>
+      <p>Два адреса в каждой сети заняты всегда: первый — номер самой сети, последний — широковещательный. Поэтому <code>/30</code> даёт ровно два рабочих адреса и идеально ложится на линк между firewall и сервером.</p>
+      <p><strong>Как считать в уме.</strong> Возьми размер блока: <code>256 минус последний октет маски</code>. Для <code>/28</code> маска <code>240</code>, блок <code>16</code>. Значит сети идут через 16: <code>.0</code>, <code>.16</code>, <code>.32</code>. Адрес <code>192.168.90.2/28</code> лежит в сети <code>192.168.90.0</code>, широковещательный у неё <code>.15</code>, пригодные — с <code>.1</code> по <code>.14</code>.</p>
+
+      <h3>Шлюз и таблица маршрутизации</h3>
+      <div class="def">
+        <div class="t">Шлюз по умолчанию</div>
+        <p>Адрес, куда узел отправляет всё, что не принадлежит его собственной сети. Обязан находиться в той же сети, что и сам узел, иначе недостижим.</p>
+        <span class="fr">fr — passerelle par défaut</span>
+      </div>
+      <p>Перед отправкой пакета узел сравнивает адрес получателя со своей сетью. Совпало — отправляет напрямую через ARP. Не совпало — отдаёт шлюзу. Маршрутизатор повторяет то же самое по своей таблице, выбирая <strong>самый точный</strong> подходящий маршрут: запись <code>/24</code> побеждает запись <code>/0</code>, потому что она конкретнее.</p>
+      <div class="trap">
+        <div class="t">Два шлюза на одной машине</div>
+        <p>Если у компьютера два интерфейса и у обоих прописан шлюз по умолчанию, операционная система выберет один из них по метрике — и не обязательно тот, который ты имел в виду. Пакет уйдёт не с того адреса, попадёт под другое правило firewall и молча отвалится по таймауту.</p>
+        <p>Проверять до того, как лезть в firewall: <code>Find-NetRoute -RemoteIPAddress &lt;цель&gt;</code> в Windows, <code>ip route get &lt;цель&gt;</code> в Linux. Обе команды показывают не только маршрут, но и <strong>адрес источника</strong>, с которого уйдёт пакет.</p>
+      </div>
+
+      <h3>VLAN: зачем резать коммутатор</h3>
+      <div class="def">
+        <div class="t">VLAN</div>
+        <p>Логическое разделение одного физического коммутатора на несколько независимых. Каждый VLAN — отдельный широковещательный домен. Узлы из разных VLAN не слышат друг друга на канальном уровне, даже если воткнуты в соседние порты.</p>
+        <span class="fr">fr — réseau local virtuel</span>
+      </div>
+      <p>Зачем это нужно: изоляция трафика, ограничение широковещания, и главное — возможность применять политику. Пока все в одном сегменте, никакой firewall между ними не поставишь, потому что трафик до него не доходит.</p>
+
+      <h4>Access и trunk</h4>
+      <p>Порт коммутатора работает в одном из двух режимов.</p>
+      <div class="kv">
+        <dt>Access</dt><dd>Порт принадлежит ровно одному VLAN. Кадры уходят к устройству <strong>без тега</strong> — конечное устройство о VLAN не знает. Так подключают обычный компьютер или принтер.</dd>
+        <dt>Trunk</dt><dd>По порту идут несколько VLAN одновременно. Чтобы их различать, к каждому кадру добавляется <strong>тег 802.1Q</strong> — четыре байта с номером VLAN. Так подключают другой коммутатор, гипервизор или точку доступа.</dd>
+      </div>
+      <div class="def">
+        <div class="t">Native VLAN</div>
+        <p>VLAN, кадры которого идут по транку <strong>без тега</strong>. По умолчанию это VLAN 1. Если на двух концах транка native VLAN разный, нетегированный трафик попадёт не туда — и это тихая ошибка, порт при этом остаётся в состоянии up.</p>
+        <span class="fr">fr — VLAN natif</span>
+      </div>
+      <p>Практика безопасности: перевести native VLAN на отдельный номер, который нигде не используется. Тогда любой случайный нетегированный кадр попадает в пустоту, а не в рабочую сеть. Это же закрывает классическую атаку с двойным тегированием.</p>
+
+      <h3>Маршрутизация между VLAN</h3>
+      <p>Разделив сеть на VLAN, ты сознательно разорвал связность. Теперь её надо вернуть — управляемо. Есть три способа.</p>
+      <div class="tw"><table>
+        <thead><tr><th>Способ</th><th>Как устроен</th><th>Плюс / минус</th></tr></thead>
+        <tbody>
+          <tr><td><b>L3-коммутатор</b></td><td>У коммутатора появляются виртуальные интерфейсы, по одному на VLAN, каждый со своим IP</td><td>Быстро, аппаратно. Требует коммутатора третьего уровня</td></tr>
+          <tr><td><b>Router-on-a-stick</b></td><td>Один физический порт роутера делится на подынтерфейсы, по одному на VLAN</td><td>Дёшево, но весь межвлановый трафик идёт через один линк</td></tr>
+          <tr><td><b>Firewall</b></td><td>Межвлановую маршрутизацию делает сам межсетевой экран</td><td>Политика применяется ко всему трафику. Но firewall становится узким местом</td></tr>
+        </tbody>
+      </table></div>
+      <div class="def">
+        <div class="t">SVI — виртуальный интерфейс VLAN</div>
+        <p>Логический интерфейс коммутатора внутри VLAN, которому назначается IP-адрес. Именно он становится шлюзом по умолчанию для узлов этого VLAN.</p>
+        <span class="fr">fr — interface virtuelle de VLAN</span>
+      </div>
+      <div class="trap">
+        <div class="t">SVI создан, а маршрутизации нет</div>
+        <p>На коммутаторе третьего уровня функция маршрутизации по умолчанию выключена. Ты можешь создать все SVI, назначить адреса, увидеть их в состоянии up — и межвлановый трафик всё равно не пойдёт. Нужна отдельная команда включения маршрутизации (у Cisco это <code>ip routing</code>). Симптом характерный: свой шлюз пингуется, чужой — нет.</p>
+      </div>
+
+      <h3>DHCP: откуда узел берёт адрес</h3>
+      <p>Обмен из четырёх сообщений, который стоит запомнить аббревиатурой <strong>DORA</strong>: Discover от клиента широковещательно, Offer от сервера, Request от клиента, Acknowledge от сервера.</p>
+      <p>Ключевой момент: Discover — широковещательный кадр, а значит он не выходит за пределы VLAN. Из этого следуют два варианта построения:</p>
+      <ul>
+        <li>DHCP-сервер живёт <strong>в каждом VLAN</strong> — обычно это сам L3-коммутатор с пулом на каждую сеть;</li>
+        <li>DHCP-сервер один и стоит в стороне, а на шлюзе каждого VLAN включается <strong>ретрансляция</strong> (DHCP relay, у Cisco — <code>ip helper-address</code>), которая превращает широковещательный запрос в адресный.</li>
+      </ul>
+      <p>Кроме адреса и маски, сервер обязан выдать <strong>шлюз</strong>, <strong>DNS-сервер</strong> и <strong>DNS-суффикс</strong>. Забыть суффикс — типовая ошибка: адрес выдан, интернет работает, а короткое имя вроде <code>web</code> не резолвится, потому что клиенту нечего дописать.</p>
+      <p>Первые адреса диапазона принято <strong>исключать</strong> из выдачи, оставляя их под статику: шлюз, принтеры, серверы.</p>
+
+      <h3>DNS: имена вместо адресов</h3>
+      <div class="kv">
+        <dt>Зона</dt><dd>Область имён, за которую сервер отвечает как источник истины. Например зона <code>abu</code> — всё, что кончается на <code>.abu</code>.</dd>
+        <dt>Запись A</dt><dd>Соответствие имени и адреса IPv4. <code>web</code> в зоне <code>abu</code> даёт полное имя <code>web.abu</code>.</dd>
+        <dt>Forwarders</dt><dd>Внешние серверы, которым отдаются запросы про чужие зоны. Без них внутренний DNS знает только свои имена и интернет для клиентов не резолвится.</dd>
+        <dt>Суффикс</dt><dd>Домен, который клиент дописывает к короткому имени. С суффиксом <code>abu</code> запрос <code>web</code> превращается в <code>web.abu</code>.</dd>
+        <dt>Кэш</dt><dd>Клиент помнит ответы, включая отрицательные. После правки зоны сбрось его, иначе будешь чинить то, что уже работает.</dd>
+      </div>
+      <div class="trap">
+        <div class="t">Отрицательный ответ живёт в кэше</div>
+        <p>Спросил имя до того, как создал запись — получил «не найдено» и запомнил. Создал запись — а клиент всё ещё отвечает «не найдено», потому что помнит отказ. Сбрось кэш и проверяй заново: <code>ipconfig /flushdns</code> в Windows, <code>resolvectl flush-caches</code> в systemd-системах.</p>
+      </div>
+
+      <h3>NAT: подмена адреса</h3>
+      <div class="def">
+        <div class="t">Исходящий NAT</div>
+        <p>Подмена адреса источника на выходе наружу. Внутренние сети используют частные диапазоны, которые в интернете не маршрутизируются, поэтому firewall подставляет вместо них свой внешний адрес и запоминает соответствие, чтобы вернуть ответ.</p>
+        <span class="fr">fr — NAT sortant</span>
+      </div>
+      <div class="def">
+        <div class="t">Проброс порта</div>
+        <p>Обратная операция: подмена адреса назначения на входе. Запрос приходит на внешний адрес и порт, firewall переписывает их на внутренний сервер и его порт. Так публикуется сервис, стоящий за firewall.</p>
+        <span class="fr">fr — redirection de port</span>
+      </div>
+      <p><strong>Автоматический режим против ручного.</strong> В автоматическом firewall сам создаёт правила трансляции для всех своих внутренних сетей. В ручном ты перечисляешь их явно. Ручной режим требуют не из вредности: он заставляет понимать, какие сети выходят наружу, и не даёт незаметно выпустить сеть, которую ты выпускать не собирался.</p>
+      <p>Важное следствие, которое многие упускают: <strong>самому firewall NAT не нужен</strong>. Он и так отправляет пакеты со своего внешнего адреса. Транслировать нужно только те сети, что стоят за ним.</p>
+
+      <h3>Межсетевой экран</h3>
+      <div class="def">
+        <div class="t">Stateful-фильтрация</div>
+        <p>Firewall помнит установленные соединения в таблице состояний. Разрешив запрос наружу, он автоматически пропускает ответ обратно — обратное правило писать не нужно и не надо.</p>
+        <span class="fr">fr — filtrage à état</span>
+      </div>
+      <p>Из этого следуют три вещи, которые надо держать в голове постоянно:</p>
+      <ul>
+        <li><strong>Правила проверяются по порядку сверху вниз, побеждает первое совпадение.</strong> Поэтому запрет, поставленный выше разрешения, отменяет его полностью. Порядок — это не оформление, это логика.</li>
+        <li><strong>Что не разрешено — запрещено.</strong> В конце списка стоит неявный запрет. Явное правило «запретить всё» в конце писать не нужно, но полезно понимать, что оно там есть.</li>
+        <li><strong>Смена правил не рвёт уже установленные соединения.</strong> Старая сессия доживает в таблице состояний, и кажется, что новое правило не работает. Подожди истечения или сбрось состояния принудительно.</li>
+      </ul>
+      <p>Правила применяются <strong>на входе в интерфейс</strong>, к трафику, который в этот интерфейс приходит. Правило для клиентов пишется на том интерфейсе, откуда клиенты приходят, а не на том, куда они идут.</p>
+
+      <div class="def">
+        <div class="t">DMZ</div>
+        <p>Сегмент для сервисов, доступных снаружи. Смысл в том, что взломанный публичный сервер не должен получить доступ во внутреннюю сеть. Поэтому из DMZ наружу и внутрь по умолчанию не разрешено ничего: сервер только отвечает на входящие соединения, а инициировать свои не может.</p>
+        <span class="fr">fr — zone démilitarisée</span>
+      </div>
+
+      <h3>Словарь: русский — французский</h3>
+      <div class="tw"><table>
+        <thead><tr><th>Русский</th><th>Français</th><th>Где встретится</th></tr></thead>
+        <tbody>
+          <tr><td>Коммутатор</td><td>commutateur</td><td>Задание, схема</td></tr>
+          <tr><td>Маршрутизатор</td><td>routeur</td><td>Задание</td></tr>
+          <tr><td>Межсетевой экран</td><td>pare-feu</td><td>Задание, интерфейс</td></tr>
+          <tr><td>Шлюз по умолчанию</td><td>passerelle par défaut</td><td>Настройки, вывод команд</td></tr>
+          <tr><td>Маска подсети</td><td>masque de sous-réseau</td><td>Настройки</td></tr>
+          <tr><td>Правило</td><td>règle</td><td>Firewall</td></tr>
+          <tr><td>Проброс порта</td><td>redirection de port</td><td>Firewall</td></tr>
+          <tr><td>Аренда адреса</td><td>bail DHCP</td><td>Вывод ipconfig</td></tr>
+          <tr><td>Точка доступа</td><td>point d'accès</td><td>Wi-Fi</td></tr>
+          <tr><td>Транк</td><td>trunk / liaison agrégée</td><td>Коммутатор</td></tr>
+          <tr><td>Проверка, тест</td><td>vérification, test</td><td>Отчёт</td></tr>
+          <tr><td>Снимок экрана</td><td>capture d'écran</td><td>Требования к отчёту</td></tr>
+          <tr><td>Процедура</td><td>procédure</td><td>Требования к отчёту</td></tr>
+        </tbody>
+      </table></div>
+    </section>
+
+    <!-- ============ 2 ============ -->
+    <section id="m2">
+      <div class="sec-h"><span class="sec-n">02</span><h2>Семь слоёв сборки</h2></div>
+      <p class="sec-lede">Порядок работы, который экономит часы. Каждый слой опирается на предыдущий, и переход дальше запрещён, пока текущий не проверен.</p>
+
+      <p>Причина простая. Если собрать всё сразу и в конце обнаружить, что клиент не выходит в интернет, кандидатов на виновника будет полтора десятка: VLAN, транк, шлюз, маршрут, NAT, правило, DNS. Если же каждый слой проверен, кандидат ровно один — тот, что ты только что трогал.</p>
+
+      <div class="layers">
+        <div class="layer"><div class="n"></div><div>
+          <h4>Физика и порты</h4>
+          <p>Кабели воткнуты, порты в состоянии up, устройства включены и доступны по консоли.</p>
+          <span class="chk">проверка: индикация линка, состояние портов в выводе коммутатора</span>
+        </div></div>
+        <div class="layer"><div class="n"></div><div>
+          <h4>Канальный уровень: VLAN и транки</h4>
+          <p>VLAN созданы и названы, порты распределены, транки поднялись и пропускают нужные VLAN.</p>
+          <span class="chk">проверка: список VLAN, список транков и разрешённых на них VLAN</span>
+        </div></div>
+        <div class="layer"><div class="n"></div><div>
+          <h4>Сетевой уровень внутри</h4>
+          <p>SVI подняты, адреса назначены, маршрутизация включена. Узел из одного VLAN достаёт узел из другого.</p>
+          <span class="chk">проверка: ping со шлюза на шлюз, затем между узлами разных VLAN</span>
+        </div></div>
+        <div class="layer"><div class="n"></div><div>
+          <h4>Адресация клиентов</h4>
+          <p>DHCP выдаёт адрес, маску, шлюз, DNS и суффикс. Аренда видна на сервере.</p>
+          <span class="chk">проверка: полный вывод конфигурации на клиенте, таблица аренд на сервере</span>
+        </div></div>
+        <div class="layer"><div class="n"></div><div>
+          <h4>Имена</h4>
+          <p>Зона создана, записи заведены, клиенты используют внутренний DNS, forwarders настроены.</p>
+          <span class="chk">проверка: внутреннее имя резолвится, внешнее имя резолвится через тот же сервер</span>
+        </div></div>
+        <div class="layer"><div class="n"></div><div>
+          <h4>Выход наружу</h4>
+          <p>Транзитный линк до firewall, маршрут по умолчанию внутрь, обратные маршруты наружу, NAT.</p>
+          <span class="chk">проверка: клиент открывает внешний сайт по имени</span>
+        </div></div>
+        <div class="layer"><div class="n"></div><div>
+          <h4>Публикация и ограничение</h4>
+          <p>Проброс порта до сервиса, затем — и только затем — ужесточение правил доступа.</p>
+          <span class="chk">проверка: сервис доступен снаружи, запрещённое действительно запрещено</span>
+        </div></div>
+      </div>
+
+      <div class="trap">
+        <div class="t">Почему ограничения идут последними</div>
+        <p>Пока связность не доказана, включённые ограничения делают диагностику невозможной: непонятно, сеть не работает или правило режет. Сначала добейся, чтобы работало всё, зафиксируй это проверкой, и только потом закрывай лишнее — тогда каждое сломавшееся после ужесточения место однозначно указывает на конкретное правило.</p>
+      </div>
+
+      <h3>Правило обратного маршрута</h3>
+      <p>Самая частая логическая ошибка при соединении двух маршрутизирующих устройств: настроить маршрут только в одну сторону. Пакет уходит, доходит, а ответ вернуться не может, потому что вторая сторона не знает, где живёт исходная сеть.</p>
+      <p>Держи в голове симметрию: <strong>для каждого нового сегмента спроси себя, знает ли о нём противоположная сторона</strong>. Внутренний маршрутизатор отдаёт всё неизвестное на firewall маршрутом по умолчанию. Firewall, в свою очередь, должен получить по одному маршруту на каждую внутреннюю сеть, указывающему обратно на внутренний маршрутизатор.</p>
+    </section>
+
+    <!-- ============ 3 ============ -->
+    <section id="m3">
+      <div class="sec-h"><span class="sec-n">03</span><h2>Runbook на три дня</h2></div>
+      <p class="sec-lede">Регламент с нормативами времени. Нормативы даны с запасом на отладку: если укладываешься быстрее — хорошо, если нет — смотри, какой слой съедает время, там и пробел.</p>
+
+      <div class="day">
+        <div class="day-h"><b>День 1</b><span>внутренняя сеть · ≈ 6 часов</span></div>
+        <div class="slot"><div class="t">0:00–0:30</div><div><h4>Разбор задания и план адресации</h4><p>Выписать, что задано жёстко, а что на твоё усмотрение. Расписать таблицу: сеть, маска, шлюз, назначение. Ошибка здесь стоит переделки всего.</p></div></div>
+        <div class="slot"><div class="t">0:30–1:00</div><div><h4>Схема на бумаге</h4><p>Кто с кем соединён, какой порт, какие VLAN идут по каждому линку. Схема — не украшение отчёта, а рабочий инструмент: по ней проверяют себя.</p></div></div>
+        <div class="slot"><div class="t">1:00–2:00</div><div><h4>Слой 1–2: VLAN, порты, транки</h4><p>Создать VLAN, раздать порты, поднять транки с явным перечнем разрешённых VLAN.</p></div></div>
+        <div class="slot"><div class="t">2:00–3:00</div><div><h4>Слой 3: SVI, маршрутизация внутри</h4><p>Адреса на SVI, включение маршрутизации, проверка связности между VLAN.</p></div></div>
+        <div class="slot"><div class="t">3:00–3:45</div><div><h4>Виртуализация: привязка VLAN</h4><p>Виртуальный коммутатор на физическом порту в транке, каждой машине — свой VLAN.</p></div></div>
+        <div class="slot"><div class="t">3:45–4:45</div><div><h4>Слой 4: DHCP</h4><p>Пулы, исключения, шлюз, DNS, суффикс. Проверка на живом клиенте.</p></div></div>
+        <div class="slot"><div class="t">4:45–5:45</div><div><h4>Слой 5: DNS</h4><p>Зона, записи, forwarders. Проверка внутреннего и внешнего имени.</p></div></div>
+        <div class="slot"><div class="t">5:45–6:00</div><div><h4>Скриншоты и запись в отчёт</h4><p>Снять доказательства по горячим следам, пока стенд в нужном состоянии.</p></div></div>
+      </div>
+
+      <div class="day">
+        <div class="day-h"><b>День 2</b><span>выход наружу и публикация · ≈ 6 часов</span></div>
+        <div class="slot"><div class="t">0:00–0:15</div><div><h4>Повторение вчерашнего</h4><p>Карточки по VLAN, DHCP, DNS. Пятнадцать минут извлечения из памяти.</p></div></div>
+        <div class="slot"><div class="t">0:15–1:15</div><div><h4>Точка доступа Wi-Fi</h4><p>Адрес управления в служебном VLAN, беспроводные сети с привязкой к клиентским VLAN, транк до коммутатора.</p></div></div>
+        <div class="slot"><div class="t">1:15–2:15</div><div><h4>Firewall: интерфейсы и транзит</h4><p>Внешний, внутренний и DMZ. Транзитный линк до внутреннего маршрутизатора.</p></div></div>
+        <div class="slot"><div class="t">2:15–3:00</div><div><h4>Маршруты и NAT</h4><p>Обратные маршруты на внутренние сети, режим трансляции, проверка выхода в интернет.</p></div></div>
+        <div class="slot"><div class="t">3:00–4:00</div><div><h4>Веб-сервер и виртуальные хосты</h4><p>Два сайта на разных портах, отключение сайта по умолчанию, проверка обоих локально.</p></div></div>
+        <div class="slot"><div class="t">4:00–4:45</div><div><h4>Публикация наружу</h4><p>Проброс порта, проверка с внешней машины, а не изнутри.</p></div></div>
+        <div class="slot"><div class="t">4:45–6:00</div><div><h4>Резерв на отладку</h4><p>Он понадобится. Если не понадобился — иди в раздел 6 и сломай что-нибудь намеренно.</p></div></div>
+      </div>
+
+      <div class="day">
+        <div class="day-h"><b>День 3</b><span>безопасность и сдача · ≈ 5 часов</span></div>
+        <div class="slot"><div class="t">0:00–0:15</div><div><h4>Повторение</h4><p>Карточки по NAT, правилам, порядку.</p></div></div>
+        <div class="slot"><div class="t">0:15–1:30</div><div><h4>Ограничение доступа</h4><p>Снять разрешающее всё правило, построить минимально необходимый набор. Проверять после каждого правила, а не в конце.</p></div></div>
+        <div class="slot"><div class="t">1:30–2:15</div><div><h4>Дополнительное усиление</h4><p>Управление только из служебной сети, смена паролей по умолчанию, отключение незашифрованных протоколов управления, гашение неиспользуемых портов.</p></div></div>
+        <div class="slot"><div class="t">2:15–3:45</div><div><h4>Документация</h4><p>Сборка отчёта из заготовок, сделанных по ходу. Раздел 8.</p></div></div>
+        <div class="slot"><div class="t">3:45–5:00</div><div><h4>Финальный прогон</h4><p>Пройти все проверки подряд и убедиться, что ужесточение ничего не сломало.</p></div></div>
+      </div>
+
+      <hr class="soft">
+
+      <h3>Блок A. VLAN, транки, порты</h3>
+      <p>Цель слоя — разделить коммутатор на независимые сегменты и провести нужные из них до устройств, которые понимают теги.</p>
+      <div class="cmd">
+        <div class="cmd-h"><span class="where">коммутатор</span> · создание VLAN и раздача портов</div>
+<pre><span class="c">! имя VLAN нужно человеку, а не коммутатору — но в отчёте оно читается</span>
+vlan 10
+ name CLIENTS
+vlan 90
+ name ADMIN
+<span class="c">! порт к обычному компьютеру: один VLAN, без тега</span>
+interface &lt;порт&gt;
+ switchport mode access
+ switchport access vlan 10
+<span class="c">! порт к гипервизору или точке доступа: несколько VLAN, с тегами</span>
+interface &lt;порт&gt;
+ switchport trunk encapsulation dot1q
+ switchport mode trunk
+ switchport trunk allowed vlan 10,90
+ switchport trunk native vlan 999
+ switchport nonegotiate</pre>
+        <p class="cmd-note">Разбор построчно. <code>allowed vlan</code> — белый список: всё, что не перечислено, по транку не пойдёт. Перечислять явно, а не оставлять «все», чтобы лишний VLAN не утёк на устройство, которому не положено. <code>native vlan 999</code> — увести нетегированный трафик в неиспользуемый VLAN. <code>nonegotiate</code> — запретить автоматическое согласование режима порта, чтобы порт нельзя было уговорить стать транком.</p>
+      </div>
+      <div class="gate">
+        <div class="t">Проверка слоя 2</div>
+        <label><input type="checkbox" data-k="g2a"><span>VLAN созданы, в списке видны с нужными именами</span></label>
+        <label><input type="checkbox" data-k="g2b"><span>Транковые порты в состоянии trunking, а не в access</span></label>
+        <label><input type="checkbox" data-k="g2c"><span>На каждом транке разрешены именно те VLAN, что нужны, и не больше</span></label>
+        <p class="why">Если транк не поднялся, дальше идти бессмысленно: адреса на SVI появятся, но трафик до них не дойдёт.</p>
+      </div>
+
+      <h3>Блок B. Маршрутизация внутри</h3>
+      <div class="cmd">
+        <div class="cmd-h"><span class="where">коммутатор</span> · SVI и включение маршрутизации</div>
+<pre><span class="k">ip routing</span>            <span class="c">! без этой строки SVI поднимутся, но маршрутизировать не будут</span>
+
+interface Vlan10
+ ip address 192.168.10.1 255.255.255.0
+ no shutdown
+
+interface Vlan90
+ ip address 192.168.90.1 255.255.255.240
+ no shutdown
+
+<span class="c">! порт до firewall делается маршрутизируемым: у него собственный IP</span>
+interface &lt;порт до firewall&gt;
+ no switchport
+ ip address 192.168.255.249 255.255.255.248
+
+<span class="c">! всё неизвестное — на firewall</span>
+ip route 0.0.0.0 0.0.0.0 192.168.255.250</pre>
+        <p class="cmd-note"><code>no switchport</code> превращает порт коммутатора в порт маршрутизатора: он перестаёт быть частью VLAN и получает собственный адрес. Так строится транзитный линк точка-точка.</p>
+      </div>
+      <div class="gate">
+        <div class="t">Проверка слоя 3</div>
+        <label><input type="checkbox" data-k="g3a"><span>Каждый SVI отвечает на ping со своего VLAN</span></label>
+        <label><input type="checkbox" data-k="g3b"><span>Узел одного VLAN пингует узел другого VLAN</span></label>
+        <label><input type="checkbox" data-k="g3c"><span>В таблице маршрутизации видны все внутренние сети как подключённые</span></label>
+        <label><input type="checkbox" data-k="g3d"><span>Маршрут по умолчанию указывает на firewall</span></label>
+      </div>
+
+      <h3>Блок C. Виртуализация и VLAN</h3>
+      <p>Гипервизор подключён к коммутатору транком. На стороне гипервизора каждой виртуальной машине назначается один VLAN — тег добавляет гипервизор. Хостовая система, если ей нужен доступ, тоже получает свой VLAN.</p>
+      <div class="cmd">
+        <div class="cmd-h"><span class="where">гипервизор</span> · пример на Hyper-V</div>
+<pre><span class="c"># виртуальный коммутатор на физической карте, хост тоже подключён</span>
+New-VMSwitch -Name "EXT" -NetAdapterName "&lt;карта&gt;" -AllowManagementOS $true
+
+<span class="c"># хостовая система — в служебный VLAN</span>
+Set-VMNetworkAdapterVlan -ManagementOS -VMNetworkAdapterName "EXT" -Access -VlanId 90
+
+<span class="c"># виртуальным машинам — их VLAN</span>
+Set-VMNetworkAdapterVlan -VMName "&lt;имя ВМ&gt;" -Access -VlanId 10
+
+<span class="c"># контроль</span>
+Get-VMNetworkAdapterVlan</pre>
+        <p class="cmd-note">Логика одинакова у любого гипервизора: физический линк — транк, виртуальный порт — access. Меняются только названия команд.</p>
+      </div>
+
+      <h3>Блок D. DHCP</h3>
+      <div class="cmd">
+        <div class="cmd-h"><span class="where">коммутатор</span> · пул на каждый клиентский VLAN</div>
+<pre><span class="c">! зарезервировать начало диапазона под статику</span>
+ip dhcp excluded-address 192.168.10.1 192.168.10.20
+
+ip dhcp pool CLIENTS10
+ network 192.168.10.0 255.255.255.0
+ default-router 192.168.10.1
+ dns-server 192.168.50.2
+ domain-name abu</pre>
+        <p class="cmd-note">Четыре обязательных параметра: сеть, шлюз, DNS, суффикс. Без суффикса короткие имена не заработают, а это отдельный пункт задания.</p>
+      </div>
+      <div class="gate">
+        <div class="t">Проверка слоя 4</div>
+        <label><input type="checkbox" data-k="g4a"><span>Клиент получил адрес из нужного диапазона</span></label>
+        <label><input type="checkbox" data-k="g4b"><span>В выданной конфигурации есть шлюз, DNS и суффикс</span></label>
+        <label><input type="checkbox" data-k="g4c"><span>Аренда видна в таблице на сервере</span></label>
+      </div>
+
+      <h3>Блок E. DNS</h3>
+      <div class="cmd">
+        <div class="cmd-h"><span class="where">сервер имён</span> · зона, записи, пересылка</div>
+<pre><span class="c"># прямая зона внутреннего домена</span>
+Add-DnsServerPrimaryZone -Name "abu" -ZoneFile "abu.dns"
+
+<span class="c"># записи на устройства и сервисы</span>
+Add-DnsServerResourceRecordA -ZoneName "abu" -Name "svi" -IPv4Address 192.168.90.1
+Add-DnsServerResourceRecordA -ZoneName "abu" -Name "web" -IPv4Address 10.0.0.1
+
+<span class="c"># всё остальное — наружу</span>
+Add-DnsServerForwarder -IPAddress 1.1.1.1, 8.8.8.8</pre>
+        <p class="cmd-note">Запись на сетевое устройство обычно указывает на тот его интерфейс, из которого им управляют. Запись на веб-сервер — на адрес, доступный клиентам.</p>
+      </div>
+      <div class="gate">
+        <div class="t">Проверка слоя 5</div>
+        <label><input type="checkbox" data-k="g5a"><span>Внутреннее имя резолвится с клиента</span></label>
+        <label><input type="checkbox" data-k="g5b"><span>Внешнее имя резолвится через внутренний сервер</span></label>
+        <label><input type="checkbox" data-k="g5c"><span>Клиент использует именно внутренний DNS, а не публичный</span></label>
+      </div>
+
+      <h3>Блок F. Firewall: интерфейсы, маршруты, трансляция</h3>
+      <p>Три интерфейса — внешний, внутренний, DMZ. Шлюз по умолчанию задаётся <strong>только на внешнем</strong>: у остальных его быть не должно, иначе устройство не будет знать, куда отправлять неизвестное.</p>
+      <h4>Обратные маршруты</h4>
+      <p>Firewall знает только свои подключённые сети. Внутренние сети живут за внутренним маршрутизатором, поэтому нужен один маршрут на каждую из них, указывающий на его транзитный адрес. Пропустить хоть одну — получить сеть, из которой всё уходит и ничего не возвращается.</p>
+      <h4>Трансляция</h4>
+      <p>Переключить исходящий NAT в ручной режим и перечислить внутренние сети явно. DMZ, как правило, не транслируется: серверу там наружу ходить незачем.</p>
+      <div class="gate">
+        <div class="t">Проверка слоя 6</div>
+        <label><input type="checkbox" data-k="g6a"><span>Firewall пингует внешний адрес в интернете</span></label>
+        <label><input type="checkbox" data-k="g6b"><span>Firewall пингует внутренний узел за маршрутизатором</span></label>
+        <label><input type="checkbox" data-k="g6c"><span>Клиент открывает внешний сайт по имени</span></label>
+        <p class="why">Если firewall в интернет ходит, а клиент нет — проблема в обратном маршруте, в трансляции или в правиле, но точно не в канале до провайдера.</p>
+      </div>
+
+      <h3>Блок G. Публикация сервиса</h3>
+      <p>Веб-сервер поднимает два виртуальных хоста на разных портах: внутренний и публичный. Сначала оба проверяются локально на самом сервере, и только потом публикуются наружу.</p>
+      <div class="cmd">
+        <div class="cmd-h"><span class="where">веб-сервер</span> · два виртуальных хоста</div>
+<pre><span class="c"># сервер должен слушать оба порта</span>
+Listen 80
+Listen 8080
+
+&lt;VirtualHost *:80&gt;
+    ServerName web.abu
+    DocumentRoot /var/www/internal
+&lt;/VirtualHost&gt;
+
+&lt;VirtualHost *:8080&gt;
+    ServerName public.abu
+    DocumentRoot /var/www/public
+&lt;/VirtualHost&gt;
+
+<span class="c"># включить свои сайты, выключить сайт по умолчанию</span>
+a2ensite internal.conf public.conf
+a2dissite 000-default.conf
+systemctl reload apache2</pre>
+        <p class="cmd-note">Сайт по умолчанию отключают не для красоты: пока он включён, он перехватывает запросы, не совпавшие ни с одним именем, и ты видишь стандартную страницу вместо своей.</p>
+      </div>
+      <p>Проброс порта: входящий на внешний адрес и порт, назначение — внутренний сервер и его порт. Проверять обязательно <strong>с внешней машины</strong>: изнутри запрос может пройти другим путём и ничего не доказать.</p>
+
+      <h3>Блок H. Ограничение доступа</h3>
+      <p>Здесь порядок правил решает всё. Общий принцип: сначала разрешить точечное, потом запретить широкое, в конце разрешить общее.</p>
+      <div class="cmd">
+        <div class="cmd-h"><span class="where">firewall</span> · схема набора правил на внутреннем интерфейсе</div>
+<pre>1  РАЗРЕШИТЬ  админ-сеть        →  куда угодно      любой протокол
+2  РАЗРЕШИТЬ  сеть управления   →  сам firewall     только порты управления
+3  ЗАПРЕТИТЬ  клиенты           →  сам firewall
+4  РАЗРЕШИТЬ  клиенты           →  адрес сервиса    только нужный порт
+5  ЗАПРЕТИТЬ  клиенты           →  все частные сети
+6  РАЗРЕШИТЬ  сервер имён       →  куда угодно      только порт DNS
+7  РАЗРЕШИТЬ  клиенты           →  куда угодно      только веб-порты
+   (неявный запрет всего остального)</pre>
+        <p class="cmd-note">Почему правило 4 обязано стоять выше правила 5: сервис живёт в частном диапазоне, и широкий запрет, поставленный раньше, отрежет к нему доступ. Это тот случай, когда перестановка двух строк ломает работающую систему, а в логах выглядит как «внезапно перестало».</p>
+      </div>
+      <p>Пользуйся <strong>псевдонимами</strong> для групп сетей и портов. Одно имя вместо перечисления делает правила читаемыми, а при изменении состава группы не надо править семь правил.</p>
+      <div class="gate">
+        <div class="t">Проверка слоя 7</div>
+        <label><input type="checkbox" data-k="g7a"><span>Разрешённое работает: клиент открывает сайт и выходит в интернет</span></label>
+        <label><input type="checkbox" data-k="g7b"><span>Запрещённое действительно не работает — проверено, а не предположено</span></label>
+        <label><input type="checkbox" data-k="g7c"><span>Управление firewall с рабочего места не потеряно</span></label>
+        <label><input type="checkbox" data-k="g7d"><span>На DMZ нет разрешающих правил, на внешнем — только публикация</span></label>
+      </div>
+      <div class="trap">
+        <div class="t">Правило защиты от блокировки</div>
+        <p>У многих firewall на внутреннем интерфейсе есть встроенное правило, пропускающее к самому устройству с любого адреса на порты управления. Оно стоит выше твоих правил, поэтому твой запрет «клиентам к firewall» будет холостым: клиент всё равно откроет веб-интерфейс. Отключать его можно только после того, как ты явно прописал разрешение для своей рабочей сети — иначе потеряешь доступ и пойдёшь к консоли.</p>
+      </div>
+    </section>
+
+    <!-- ============ 4 ============ -->
+    <section id="m4">
+      <div class="sec-h"><span class="sec-n">04</span><h2>Диагностика</h2></div>
+      <p class="sec-lede">Навык, который отличает уверенную работу от угадывания. На экзамене что-нибудь сломается обязательно, и оценивается не отсутствие поломки, а скорость локализации.</p>
+
+      <h3>Выбор направления</h3>
+      <p>Два способа двигаться по стеку, и выбирать надо осознанно.</p>
+      <div class="kv">
+        <dt>Снизу вверх</dt><dd>От кабеля к приложению. Годится, когда не работает вообще ничего или когда стенд новый и ещё ни разу не работал. Медленнее, но не пропускает.</dd>
+        <dt>Сверху вниз</dt><dd>От приложения к кабелю. Годится, когда «вчера работало, сегодня нет» и есть подозреваемый — например, ты только что менял правила.</dd>
+      </div>
+      <p>Правило разделения пополам: не иди подряд, а проверь середину. Пингуется ли шлюз? Если да — нижняя половина цела, ищи выше. Если нет — вся верхняя половина не важна.</p>
+
+      <h3>Симптом, гипотеза, проверка</h3>
+      <div class="tw"><table>
+        <thead><tr><th>Симптом</th><th>Вероятные причины</th><th>Чем проверить</th></tr></thead>
+        <tbody>
+          <tr><td><b>Клиент не получил адрес</b></td><td>Порт не в том VLAN; пул не создан; VLAN не доходит по транку; сервер вне сегмента и нет ретрансляции</td><td>VLAN порта, список транков, таблица аренд, наличие пула</td></tr>
+          <tr><td><b>Адрес есть, свой шлюз не пингуется</b></td><td>SVI не поднят; адрес не из той сети; порт в чужом VLAN</td><td>Состояние интерфейсов, маска на клиенте и на SVI</td></tr>
+          <tr><td><b>Свой шлюз пингуется, чужой VLAN нет</b></td><td>Маршрутизация не включена; SVI второго VLAN опущен</td><td>Флаг маршрутизации, таблица маршрутов, состояние второго SVI</td></tr>
+          <tr><td><b>Внутри всё работает, интернета нет</b></td><td>Нет маршрута по умолчанию; нет обратных маршрутов на firewall; нет трансляции для этой сети; правило не пропускает</td><td>Таблица маршрутов с обеих сторон, список правил трансляции, счётчики правил</td></tr>
+          <tr><td><b>Интернет по адресу есть, по имени нет</b></td><td>Клиент смотрит не на тот DNS; нет forwarders; кэш держит старый отказ</td><td>Какой DNS у клиента, запрос напрямую к серверу, сброс кэша</td></tr>
+          <tr><td><b>Имя резолвится, сайт не открывается</b></td><td>Запись указывает не на тот адрес; сервис не слушает нужный порт; правило режет порт</td><td>Ответ DNS, список слушающих портов на сервере, счётчик правила</td></tr>
+          <tr><td><b>Снаружи публикация не работает</b></td><td>Проброс на неверный внутренний порт; нет правила на внешнем интерфейсе; проверяешь изнутри</td><td>Правило публикации, проверка строго с внешней машины</td></tr>
+          <tr><td><b>Правило добавил, поведение не изменилось</b></td><td>Живое соединение в таблице состояний; правило ниже перекрывающего; правило на другом интерфейсе</td><td>Порядок правил, счётчики совпадений, сброс состояний</td></tr>
+          <tr><td><b>Работает с одной машины и не работает с другой в той же сети</b></td><td>У второй машины два шлюза и трафик уходит не с того адреса; статический адрес мимо диапазона</td><td>Определение маршрута до цели с показом адреса источника</td></tr>
+          <tr><td><b>Wi-Fi подключается, адреса нет</b></td><td>Сеть не привязана к VLAN; VLAN не разрешён на транке до точки</td><td>Привязка сети к VLAN на точке, список разрешённых VLAN на транке</td></tr>
+        </tbody>
+      </table></div>
+
+      <h3>Минимальный набор команд</h3>
+      <div class="tw"><table>
+        <thead><tr><th>Вопрос</th><th>Windows</th><th>Linux</th></tr></thead>
+        <tbody>
+          <tr><td>Какой у меня адрес и шлюз</td><td class="mono">ipconfig /all</td><td class="mono">ip -br addr; ip route</td></tr>
+          <tr><td>Каким путём пойдёт пакет и с какого адреса</td><td class="mono">Find-NetRoute -RemoteIPAddress X</td><td class="mono">ip route get X</td></tr>
+          <tr><td>Доходит ли до узла</td><td class="mono">ping X</td><td class="mono">ping -c4 X</td></tr>
+          <tr><td>Где обрывается путь</td><td class="mono">tracert X</td><td class="mono">traceroute X</td></tr>
+          <tr><td>Открыт ли порт</td><td class="mono">Test-NetConnection X -Port N</td><td class="mono">nc -zv X N</td></tr>
+          <tr><td>Что отвечает DNS</td><td class="mono">nslookup имя сервер</td><td class="mono">dig @сервер имя</td></tr>
+          <tr><td>Кто слушает порты</td><td class="mono">netstat -ano</td><td class="mono">ss -tlnp</td></tr>
+          <tr><td>Сбросить кэш имён</td><td class="mono">ipconfig /flushdns</td><td class="mono">resolvectl flush-caches</td></tr>
+        </tbody>
+      </table></div>
+      <p class="note">Про ping отдельно: он проверяет ICMP, а не «работает ли сеть». Firewall может пропускать веб-трафик и резать ICMP — тогда ping молчит, а сайт открывается. Не делай вывод «сети нет» по одному пингу; проверяй тот протокол, который тебе действительно нужен.</p>
+    </section>
+
+    <!-- ============ 5 ============ -->
+    <section id="m5">
+      <div class="sec-h"><span class="sec-n">05</span><h2>Ловушки</h2></div>
+      <p class="sec-lede">Вещи, которые ведут себя не так, как ожидаешь. Каждая из них съедает от получаса до вечера, если не знать заранее.</p>
+
+      <div class="trap"><div class="t">01 · Маршрутизация выключена по умолчанию</div>
+        <p>SVI подняты, адреса на месте, состояние up — а межвлановый трафик не идёт. На коммутаторе третьего уровня функцию маршрутизации надо включать явно.</p></div>
+
+      <div class="trap"><div class="t">02 · Правило защиты от блокировки перекрывает твой запрет</div>
+        <p>Встроенное правило firewall пропускает к самому устройству с любого адреса. Пока оно включено, твой запрет клиентам не работает. Снимать только после явного разрешения для своей сети.</p></div>
+
+      <div class="trap"><div class="t">03 · Старые соединения переживают смену правил</div>
+        <p>Ужесточил правила, а запрещённое всё ещё работает. Это доживает запись в таблице состояний. Подожди или сбрось состояния — и проверяй заново.</p></div>
+
+      <div class="trap"><div class="t">04 · Значение по умолчанию не видно в конфигурации</div>
+        <p>Задал параметр, а в выгрузке его нет. Многие устройства не показывают настройки, совпадающие с заводскими. Если параметр должен быть виден в отчёте — задай значение, отличное от умолчания.</p></div>
+
+      <div class="trap"><div class="t">05 · Два шлюза по умолчанию на одной машине</div>
+        <p>Проводная сеть и Wi-Fi одновременно, у обеих шлюз. Трафик уходит с непредсказуемого адреса. Для чистых проверок отключай лишний интерфейс.</p></div>
+
+      <div class="trap"><div class="t">06 · Порядок правил важнее их содержания</div>
+        <p>Широкий запрет, поставленный выше точечного разрешения, отменяет его целиком. Всегда читай набор сверху вниз глазами firewall: какое правило сработает первым.</p></div>
+
+      <div class="trap"><div class="t">07 · Проверка публикации изнутри ничего не доказывает</div>
+        <p>Обращение к внешнему адресу из внутренней сети может пойти коротким путём мимо проброса. Проверяй только с машины, стоящей снаружи.</p></div>
+
+      <div class="trap"><div class="t">08 · Кэш DNS помнит отказ</div>
+        <p>Спросил имя раньше, чем создал запись — получишь «не найдено» ещё некоторое время. Сбрасывай кэш перед проверкой.</p></div>
+
+      <div class="trap"><div class="t">09 · Блокировка частных сетей на внешнем интерфейсе</div>
+        <p>Если внешний интерфейс сам адресован из частного диапазона, встроенная защита от частных адресов заблокирует твою же сеть. В учебном стенде её отключают — и это надо уметь объяснить.</p></div>
+
+      <div class="trap"><div class="t">10 · Сайт по умолчанию перехватывает запросы</div>
+        <p>Пока стандартный сайт веб-сервера включён, он отвечает на всё, что не совпало с твоими именами. Отключай явно.</p></div>
+
+      <div class="trap"><div class="t">11 · Односторонний маршрут</div>
+        <p>Прописал маршрут только на одной стороне. Запрос уходит, ответ вернуться не может. Для каждого сегмента проверяй, знает ли о нём противоположная сторона.</p></div>
+
+      <div class="trap"><div class="t">12 · Псевдоним команды не то, чем кажется</div>
+        <p>В некоторых оболочках привычное имя команды подменено встроенным аналогом с другим синтаксисом. Если команда ведёт себя странно — вызывай исполняемый файл явно, с расширением.</p></div>
+
+      <div class="trap"><div class="t">13 · Синтаксис зависит от версии прошивки</div>
+        <p>Команда из документации не принимается устройством — не потому, что ты ошибся, а потому, что прошивка старше. Ищи аналог: вместо фильтрации по разделу — вывод от нужного места, вместо точного поиска — постраничный просмотр.</p></div>
+
+      <div class="trap"><div class="t">14 · Трансляция для самого firewall не нужна</div>
+        <p>Устройство и так отправляет пакеты со своего внешнего адреса. Транслируются только сети, стоящие за ним.</p></div>
+
+      <div class="trap"><div class="t">15 · Суффикс забыт в настройках выдачи адресов</div>
+        <p>Адрес и DNS выданы, полное имя резолвится, короткое — нет. Клиенту нечего дописать. Суффикс задаётся там же, где шлюз и DNS.</p></div>
+    </section>
+
+    <!-- ============ 6 ============ -->
+    <section id="m6">
+      <div class="sec-h"><span class="sec-n">06</span><h2>Тренажёр поломок</h2></div>
+      <p class="sec-lede">Беглость в диагностике рождается из цикла «настроил, сломал, прочитал состояние устройства». Здесь ты ломаешь намеренно — и учишься искать по симптому, а не по памяти о том, что сам сделал.</p>
+      <p>Как работать. Первый раз читай ответ сразу — это калибровка. Второй раз закрывай ответ, вноси неисправность и засекай время до локализации. Норматив, к которому стоит идти: <strong>любая из этих поломок находится за пять минут</strong>. Если дольше — значит какой-то слой ты не понимаешь, а не «не помнишь команду».</p>
+
+      <div class="drill"><div class="t">1 · Убрать VLAN из списка разрешённых на транке</div>
+        <p class="s">Симптом: машина в этом VLAN теряет сеть полностью, соседние работают.</p>
+        <details><summary>Как локализовать</summary><p>Порт в состоянии up, значит физика цела. Смотри список транков и разрешённых VLAN. Признак именно этой поломки: страдает ровно один VLAN, а не все.</p></details></div>
+
+      <div class="drill"><div class="t">2 · Выключить маршрутизацию на коммутаторе</div>
+        <p class="s">Симптом: свой шлюз пингуется, любой другой VLAN — нет.</p>
+        <details><summary>Как локализовать</summary><p>Классическая пара «свой да, чужой нет» указывает ровно на маршрутизацию. Смотри флаг маршрутизации и таблицу маршрутов: подключённые сети в ней есть, но трафик между ними не ходит.</p></details></div>
+
+      <div class="drill"><div class="t">3 · Стереть маршрут по умолчанию на коммутаторе</div>
+        <p class="s">Симптом: внутри всё работает, наружу ничего.</p>
+        <details><summary>Как локализовать</summary><p>Пингуй по шагам: шлюз своего VLAN, транзитный адрес, внешний адрес. Обрыв на переходе к транзиту при живом соседе означает отсутствие маршрута.</p></details></div>
+
+      <div class="drill"><div class="t">4 · Удалить один обратный маршрут на firewall</div>
+        <p class="s">Симптом: одна внутренняя сеть теряет интернет, остальные работают.</p>
+        <details><summary>Как локализовать</summary><p>Асимметрия по сетям — сильная подсказка. С firewall пингуй узел из пострадавшей сети: не отвечает, хотя маршрутизатор её знает. Смотри таблицу маршрутов firewall.</p></details></div>
+
+      <div class="drill"><div class="t">5 · Убрать одну сеть из правил трансляции</div>
+        <p class="s">Симптом: сеть достаёт внешний адрес firewall, но не идёт дальше в интернет.</p>
+        <details><summary>Как локализовать</summary><p>Ключевое отличие от предыдущей поломки: маршрут есть, трафик доходит до firewall, но ответ из интернета вернуться не может, потому что источник — частный адрес. Смотри список правил трансляции.</p></details></div>
+
+      <div class="drill"><div class="t">6 · Поменять местами точечное разрешение и широкий запрет</div>
+        <p class="s">Симптом: перестаёт открываться внутренний сервис, интернет при этом работает.</p>
+        <details><summary>Как локализовать</summary><p>Читай правила сверху вниз и найди первое, под которое попадает трафик к сервису. Счётчики совпадений покажут, какое правило реально срабатывает.</p></details></div>
+
+      <div class="drill"><div class="t">7 · Указать в выдаче адресов неверный DNS</div>
+        <p class="s">Симптом: интернет по адресу работает, внутренние имена не резолвятся.</p>
+        <details><summary>Как локализовать</summary><p>Посмотри, какой DNS реально получил клиент. Затем спроси имя напрямую у правильного сервера: если оттуда отвечает — виновата выдача, а не зона.</p></details></div>
+
+      <div class="drill"><div class="t">8 · Удалить forwarders на сервере имён</div>
+        <p class="s">Симптом: внутренние имена работают, внешние нет.</p>
+        <details><summary>Как локализовать</summary><p>Разделение ровно по границе своей зоны — подпись пересылки. Проверь список forwarders и доступность их с самого сервера.</p></details></div>
+
+      <div class="drill"><div class="t">9 · Убрать суффикс из выдачи адресов</div>
+        <p class="s">Симптом: полное имя резолвится, короткое нет.</p>
+        <details><summary>Как локализовать</summary><p>Сравни поведение <code>web</code> и <code>web.abu</code>. Разница между ними — всегда суффикс.</p></details></div>
+
+      <div class="drill"><div class="t">10 · Перевести проброс порта на несуществующий внутренний порт</div>
+        <p class="s">Симптом: снаружи соединение висит и отваливается по таймауту.</p>
+        <details><summary>Как локализовать</summary><p>С firewall проверь, слушает ли сервер тот порт, куда ты перенаправляешь. Расхождение между портом публикации и портом сервиса — самая частая причина.</p></details></div>
+
+      <div class="drill"><div class="t">11 · Отключить виртуальный хост на веб-сервере</div>
+        <p class="s">Симптом: один сайт открывается, второй отдаёт чужую страницу или ошибку.</p>
+        <details><summary>Как локализовать</summary><p>Смотри список включённых сайтов и слушающие порты. Если порт не слушается — сайт выключен; если слушается, но отдаёт не то — перехватывает другой виртуальный хост.</p></details></div>
+
+      <div class="drill"><div class="t">12 · Сменить native VLAN только на одном конце транка</div>
+        <p class="s">Симптом: тонкий. Основной трафик идёт, но нетегированный попадает не туда.</p>
+        <details><summary>Как локализовать</summary><p>Сравни native VLAN на обоих концах. Многие устройства сами пишут в журнал предупреждение о несовпадении — привыкай читать журнал, а не только вывод состояния.</p></details></div>
+
+      <div class="drill"><div class="t">13 · Задать клиенту статический адрес с неверной маской</div>
+        <p class="s">Симптом: часть узлов своей же сети доступна, часть нет.</p>
+        <details><summary>Как локализовать</summary><p>Слишком узкая маска делает часть своей сети «чужой», и трафик уходит на шлюз. Слишком широкая — наоборот, чужие адреса считаются своими и шлюз не используется. Сравни маски у двух узлов.</p></details></div>
+
+      <div class="drill"><div class="t">14 · Отключить сеть Wi-Fi от её VLAN</div>
+        <p class="s">Симптом: клиент подключается к сети, но адреса не получает.</p>
+        <details><summary>Как локализовать</summary><p>Ассоциация прошла — значит радио и пароль в порядке, ищи на канальном уровне. Проверь привязку сети к VLAN на точке и разрешён ли этот VLAN на транке до неё.</p></details></div>
+
+      <div class="drill"><div class="t">15 · Поднять второй шлюз по умолчанию на рабочей машине</div>
+        <p class="s">Симптом: часть проверок проходит, часть нет, поведение меняется от запуска к запуску.</p>
+        <details><summary>Как локализовать</summary><p>Определи маршрут до цели с показом адреса источника. Если источник не тот, что ожидаешь, — виноват не firewall, а выбор интерфейса на самой машине.</p></details></div>
+
+      <div class="drill"><div class="t">16 · Перевести транковый порт в режим access</div>
+        <p class="s">Симптом: у гипервизора остаётся связность в одном VLAN, остальные пропадают.</p>
+        <details><summary>Как локализовать</summary><p>Симптом «выжил ровно один VLAN» указывает на access вместо транка. Смотри режим порта.</p></details></div>
+
+      <div class="drill"><div class="t">17 · Исключить из выдачи весь диапазон адресов</div>
+        <p class="s">Симптом: клиенты не получают адреса, при этом пул существует и выглядит правильным.</p>
+        <details><summary>Как локализовать</summary><p>Смотри статистику пула: сколько адресов свободно. Ноль свободных при пустой таблице аренд означает, что всё исключено.</p></details></div>
+
+      <div class="drill"><div class="t">18 · Оставить на внутреннем интерфейсе только запрещающие правила</div>
+        <p class="s">Симптом: пропадает вообще всё, включая доступ к самому firewall.</p>
+        <details><summary>Как локализовать</summary><p>Это упражнение на восстановление: учись возвращать управление через консоль устройства, а не через сеть. Отработай заранее — на экзамене будет не до чтения документации.</p></details></div>
+    </section>
+
+    <!-- ============ 7 ============ -->
+    <section id="m7">
+      <div class="sec-h"><span class="sec-n">07</span><h2>Вариации</h2></div>
+      <p class="sec-lede">Пересборка того же стенда с изменённым условием. Это не проверка знаний, а способ их получить: там, где заученная последовательность не подходит, начинается понимание.</p>
+
+      <h3>Вариация 1 · Другая разрядность сетей</h3>
+      <p>Пересобери, заменив клиентскую сеть с <code>/24</code> на <code>/26</code>, а служебную с <code>/28</code> на <code>/29</code>. Придётся пересчитать границы диапазонов, исключения в выдаче адресов и проверить, что все статические адреса попадают в новые сети. Это упражнение на маски, и оно ловит любую нетвёрдость в счёте.</p>
+
+      <h3>Вариация 2 · Выдача адресов переезжает на firewall</h3>
+      <p>Убери пулы с коммутатора и подними выдачу адресов на межсетевом экране. Столкнёшься с тем, что широковещательный запрос не покидает свой VLAN, и поймёшь, зачем существует ретрансляция. Придётся включить её на каждом клиентском шлюзе.</p>
+
+      <h3>Вариация 3 · Третья клиентская сеть</h3>
+      <p>Добавь ещё один VLAN с полным набором: SVI, пул, беспроводная сеть, правила. Проверь, сколько мест придётся тронуть — их всегда больше, чем кажется: транки, разрешённые списки, маршруты на firewall, трансляция, псевдонимы, правила. Это упражнение на полноту.</p>
+
+      <h3>Вариация 4 · Сервис по защищённому протоколу</h3>
+      <p>Опубликуй сайт по HTTPS с самоподписанным сертификатом. Разберись, почему проброс на другой порт требует правки правил, и что меняется в списке разрешённых портов для клиентов.</p>
+
+      <h3>Вариация 5 · Разделение доступа между сетями</h3>
+      <p>Условие: первая клиентская сеть должна ходить в интернет и к внутреннему сервису, вторая — только в интернет, между собой они не общаются. Поскольку межвлановый трафик идёт через коммутатор и до firewall не доходит, тебе придётся решить задачу списком доступа на самом коммутаторе. Упражнение на понимание того, где именно проходит трафик.</p>
+
+      <div class="trap">
+        <div class="t">Как использовать вариации</div>
+        <p>Не подряд. Одна вариация после каждого полного прохода стенда. Смысл в том, чтобы между повторениями прошло время и заученная последовательность успела выветриться — тогда работать будет понимание, а не память.</p>
+      </div>
+    </section>
+
+    <!-- ============ 8 ============ -->
+    <section id="m8">
+      <div class="sec-h"><span class="sec-n">08</span><h2>Документация</h2></div>
+      <p class="sec-lede">Отчёт пишется по ходу работы, а не в конце. Собранный в последний вечер, он всегда получается хуже и отнимает больше времени.</p>
+
+      <h3>Что обычно требуют</h3>
+      <div class="kv">
+        <dt>Схема</dt><dd>Топология с адресацией, портами и VLAN. Делается первой и служит рабочим инструментом, а не иллюстрацией.</dd>
+        <dt>Процедуры</dt><dd>Как настраивалось, по шагам, с командами или экранами. Не «что получилось», а «что делать, чтобы повторить».</dd>
+        <dt>Конфигурации</dt><dd>Выгрузки с оборудования как доказательство, что описанное действительно стоит на железе.</dd>
+        <dt>Тесты</dt><dd>Снимки экрана, подтверждающие каждое требование задания.</dd>
+      </div>
+
+      <h3>Правило снимка экрана</h3>
+      <p>Хороший снимок доказывает утверждение целиком, без домысливания. Три вещи, которые в нём должны быть:</p>
+      <ul>
+        <li><strong>Источник.</strong> С какой машины и с какого адреса сделано. Вывод конфигурации в том же кадре решает вопрос.</li>
+        <li><strong>Действие.</strong> Видна сама команда, а не только результат.</li>
+        <li><strong>Результат.</strong> Значение, которое подтверждает требование.</li>
+      </ul>
+      <p>Особенно это важно там, где доказывается ограничение. Снимок «пинг не проходит» сам по себе не значит ничего: непонятно, откуда пинговали и не выключен ли просто интерфейс. Тот же снимок с адресом источника и рядом стоящим успешным веб-запросом доказывает ровно то, что нужно: политика работает избирательно.</p>
+
+      <div class="trap">
+        <div class="t">Снимай сразу</div>
+        <p>Состояние стенда меняется, а вернуть его ради одного кадра дорого. Закончил блок — сделал снимки этого блока. К концу дня у тебя готовая половина отчёта вместо вечера пересборки.</p>
+      </div>
+
+      <h3>Что не кладут в отчёт</h3>
+      <ul>
+        <li>Хэши паролей из выгрузок конфигурации — они вскрываются перебором. Маскируй и поясняй, что маскировка намеренная.</li>
+        <li>Приватные ключи и сертификаты.</li>
+        <li>Личные вкладки браузера и содержимое рабочего стола в кадре. Снимай окно, а не экран.</li>
+      </ul>
+    </section>
+
+    <!-- ============ 9 ============ -->
+    <section id="m9">
+      <div class="sec-h"><span class="sec-n">09</span><h2>Карточки</h2></div>
+      <p class="sec-lede">Отвечай вслух до того, как раскрыть. Узнавание ответа ощущается как знание, но им не является — работает только извлечение.</p>
+
+      <h4>Основы</h4>
+      <div class="cards">
+        <details class="card"><summary>Чем MAC-адрес отличается от IP по области действия</summary><div class="a"><p>MAC работает внутри одного сегмента и переписывается на каждом маршрутизаторе. IP сохраняется от отправителя до получателя.</p></div></details>
+        <details class="card"><summary>Что такое широковещательный домен и чем он ограничен</summary><div class="a"><p>Множество узлов, до которых доходит кадр, адресованный всем. Ограничен VLAN или маршрутизатором — тот широковещание не пропускает.</p></div></details>
+        <details class="card"><summary>Сколько пригодных адресов в /29 и почему</summary><div class="a"><p>Шесть. Всего восемь, минус адрес сети и широковещательный.</p></div></details>
+        <details class="card"><summary>Как быстро найти границы сети /28</summary><div class="a"><p>Размер блока = 256 − 240 = 16. Сети идут через 16: .0, .16, .32. Адрес .35 лежит в сети .32, широковещательный .47.</p></div></details>
+        <details class="card"><summary>Почему шлюз обязан быть в той же сети, что и узел</summary><div class="a"><p>Узел отправляет ему кадр напрямую, без маршрутизации. Чтобы это сработало, шлюз должен быть достижим на канальном уровне, то есть в той же сети.</p></div></details>
+        <details class="card"><summary>Как маршрутизатор выбирает между двумя подходящими маршрутами</summary><div class="a"><p>Побеждает более точный — с длиннее префиксом. Маршрут /24 выигрывает у /0.</p></div></details>
+      </div>
+
+      <h4>Коммутация и VLAN</h4>
+      <div class="cards">
+        <details class="card"><summary>Чем access-порт отличается от trunk</summary><div class="a"><p>Access принадлежит одному VLAN и отдаёт кадры без тега. Trunk несёт несколько VLAN и помечает кадры тегом 802.1Q.</p></div></details>
+        <details class="card"><summary>Что происходит с кадром при выходе на транк</summary><div class="a"><p>К нему добавляются четыре байта тега с номером VLAN. На выходе в access-порт тег снимается.</p></div></details>
+        <details class="card"><summary>Что такое native VLAN и чем опасно расхождение</summary><div class="a"><p>VLAN, кадры которого идут по транку без тега. Если на концах он разный, нетегированный трафик попадает не в тот сегмент, причём порт остаётся в состоянии up — ошибка тихая.</p></div></details>
+        <details class="card"><summary>Зачем переводить native VLAN на неиспользуемый номер</summary><div class="a"><p>Чтобы любой нетегированный кадр попадал в пустой сегмент. Это закрывает атаку с двойным тегированием и убирает случайный трафик из рабочих сетей.</p></div></details>
+        <details class="card"><summary>Зачем ограничивать список разрешённых VLAN на транке</summary><div class="a"><p>Чтобы на устройство не попадали сегменты, которые ему не нужны. Это и безопасность, и меньше лишнего широковещания.</p></div></details>
+        <details class="card"><summary>Что даёт запрет автосогласования режима порта</summary><div class="a"><p>Порт нельзя уговорить стать транком подключённым устройством. Закрывает подмену режима.</p></div></details>
+      </div>
+
+      <h4>Маршрутизация</h4>
+      <div class="cards">
+        <details class="card"><summary>Что такое SVI</summary><div class="a"><p>Виртуальный интерфейс коммутатора внутри VLAN с собственным IP. Служит шлюзом для узлов этого VLAN.</p></div></details>
+        <details class="card"><summary>SVI подняты, адреса есть, между VLAN связи нет. Первая гипотеза</summary><div class="a"><p>Не включена маршрутизация на коммутаторе. Симптом характерный: свой шлюз пингуется, чужой нет.</p></div></details>
+        <details class="card"><summary>Что делает превращение порта коммутатора в маршрутизируемый</summary><div class="a"><p>Порт перестаёт принадлежать VLAN и получает собственный IP. Так строят транзитный линк точка-точка между устройствами.</p></div></details>
+        <details class="card"><summary>Почему firewall нужны обратные маршруты</summary><div class="a"><p>Он знает только подключённые сети. Внутренние сегменты живут за другим маршрутизатором, и без маршрута ответ туда не уйдёт.</p></div></details>
+        <details class="card"><summary>Три способа маршрутизации между VLAN</summary><div class="a"><p>Коммутатор третьего уровня; роутер с подынтерфейсами на одном порту; сам межсетевой экран.</p></div></details>
+      </div>
+
+      <h4>Адресация и имена</h4>
+      <div class="cards">
+        <details class="card"><summary>Четыре шага получения адреса по DHCP</summary><div class="a"><p>Discover, Offer, Request, Acknowledge. Первый — широковещательный, поэтому не покидает VLAN.</p></div></details>
+        <details class="card"><summary>Что делать, если сервер выдачи адресов стоит в другом сегменте</summary><div class="a"><p>Включить ретрансляцию на шлюзе клиентской сети: она превратит широковещательный запрос в адресный к серверу.</p></div></details>
+        <details class="card"><summary>Четыре параметра, которые обязана содержать выдача</summary><div class="a"><p>Сеть с маской, шлюз, DNS-сервер, DNS-суффикс.</p></div></details>
+        <details class="card"><summary>Зачем исключать начало диапазона</summary><div class="a"><p>Чтобы оставить адреса под статику: шлюз, серверы, оборудование.</p></div></details>
+        <details class="card"><summary>Полное имя резолвится, короткое нет. Причина</summary><div class="a"><p>Клиенту не выдан DNS-суффикс, и ему нечего дописать к короткому имени.</p></div></details>
+        <details class="card"><summary>Зачем внутреннему DNS forwarders</summary><div class="a"><p>Чтобы отдавать наружу запросы про чужие зоны. Без них клиенты не смогут резолвить интернет-имена.</p></div></details>
+        <details class="card"><summary>Создал запись, а клиент её не видит. Что проверить первым</summary><div class="a"><p>Кэш клиента: он мог запомнить отрицательный ответ. Сбросить и проверить снова.</p></div></details>
+      </div>
+
+      <h4>Трансляция адресов</h4>
+      <div class="cards">
+        <details class="card"><summary>Зачем нужен исходящий NAT</summary><div class="a"><p>Частные адреса в интернете не маршрутизируются. Firewall подменяет источник своим внешним адресом и помнит соответствие для обратного пути.</p></div></details>
+        <details class="card"><summary>Чем проброс порта отличается от исходящего NAT</summary><div class="a"><p>Исходящий подменяет источник на выходе. Проброс подменяет получателя на входе, публикуя внутренний сервис.</p></div></details>
+        <details class="card"><summary>Почему самому firewall трансляция не нужна</summary><div class="a"><p>Он уже отправляет пакеты со своего внешнего адреса. Транслируются только сети за ним.</p></div></details>
+        <details class="card"><summary>Зачем требуют ручной режим вместо автоматического</summary><div class="a"><p>Чтобы список выпускаемых наружу сетей был явным и осознанным, а не создавался автоматически для всего подряд.</p></div></details>
+        <details class="card"><summary>Нужна ли трансляция для DMZ</summary><div class="a"><p>Как правило нет: сервер в DMZ отвечает на входящие соединения и наружу сам не ходит.</p></div></details>
+      </div>
+
+      <h4>Фильтрация</h4>
+      <div class="cards">
+        <details class="card"><summary>Что означает stateful и что из этого следует</summary><div class="a"><p>Firewall помнит установленные соединения и пропускает ответы автоматически. Обратные правила писать не нужно.</p></div></details>
+        <details class="card"><summary>В каком порядке проверяются правила</summary><div class="a"><p>Сверху вниз, побеждает первое совпадение. Дальше список не просматривается.</p></div></details>
+        <details class="card"><summary>Нужно ли писать запрет всего в конце списка</summary><div class="a"><p>Нет, он подразумевается. Но помнить о нём обязательно: всё неразрешённое запрещено.</p></div></details>
+        <details class="card"><summary>Почему разрешение к сервису ставят выше запрета частных сетей</summary><div class="a"><p>Сервис живёт в частном диапазоне. Широкий запрет, поставленный раньше, отрежет к нему доступ.</p></div></details>
+        <details class="card"><summary>Добавил правило, поведение не изменилось. Две первые гипотезы</summary><div class="a"><p>Живое соединение в таблице состояний, либо выше стоит перекрывающее правило.</p></div></details>
+        <details class="card"><summary>На каком интерфейсе пишется правило для клиентов</summary><div class="a"><p>На том, откуда клиенты приходят. Правила применяются к входящему в интерфейс трафику.</p></div></details>
+        <details class="card"><summary>Чем опасно встроенное правило защиты от блокировки</summary><div class="a"><p>Оно пропускает к самому firewall с любого адреса и стоит выше пользовательских правил, обесценивая запрет для клиентов.</p></div></details>
+        <details class="card"><summary>Зачем в правилах псевдонимы групп</summary><div class="a"><p>Читаемость и единая точка правки: изменение состава группы не требует переписывать каждое правило.</p></div></details>
+      </div>
+
+      <h4>Диагностика</h4>
+      <div class="cards">
+        <details class="card"><summary>Когда разбирать снизу вверх, а когда сверху вниз</summary><div class="a"><p>Снизу — когда не работает ничего или стенд новый. Сверху — когда работало и сломалось, и есть подозреваемый.</p></div></details>
+        <details class="card"><summary>В чём смысл проверки середины</summary><div class="a"><p>Одна проверка отсекает половину кандидатов. Пингуется шлюз — нижняя половина цела, ищи выше.</p></div></details>
+        <details class="card"><summary>Почему нельзя судить о сети по одному ping</summary><div class="a"><p>Ping проверяет ICMP. Firewall может резать ICMP и пропускать веб-трафик — сайт откроется, а пинг нет.</p></div></details>
+        <details class="card"><summary>Как узнать, с какого адреса машина отправит пакет к цели</summary><div class="a"><p>Определить маршрут до цели командой, показывающей выбранный интерфейс и адрес источника, а не просто смотреть таблицу.</p></div></details>
+        <details class="card"><summary>Одна сеть без интернета, остальные работают. Куда смотреть</summary><div class="a"><p>На то, что настраивается по одной сети: обратный маршрут на firewall, правило трансляции, правило доступа.</p></div></details>
+        <details class="card"><summary>Wi-Fi подключается, адрес не выдаётся. Первая гипотеза</summary><div class="a"><p>Сеть не привязана к VLAN на точке доступа или этот VLAN не разрешён на транке до неё.</p></div></details>
+        <details class="card"><summary>Публикация не работает снаружи. Что проверить до правил</summary><div class="a"><p>Слушает ли сервер тот порт, куда идёт перенаправление, и проверяешь ли ты действительно с внешней машины.</p></div></details>
+      </div>
+    </section>
+
+    <!-- ============ 10 ============ -->
+    <section id="m10">
+      <div class="sec-h"><span class="sec-n">10</span><h2>Экзамен и журнал ошибок</h2></div>
+      <p class="sec-lede">Финальная проверка: собрать стенд по памяти, без страницы перед глазами, уложившись в норматив.</p>
+
+      <h3>Условие для самопроверки</h3>
+      <p>Дано: коммутатор третьего уровня, два гипервизора, межсетевой экран, точка доступа, сервер имён, веб-сервер. Требуется:</p>
+      <ol>
+        <li>Четыре сегмента: две клиентские сети, сеть служб, сеть администрирования. Адресация на твой выбор, но записанная заранее.</li>
+        <li>Маршрутизация между сегментами на коммутаторе, автоматическая выдача адресов клиентам с него же.</li>
+        <li>Внутреннее разрешение имён: имя для коммутатора, имя для веб-сервера, работающий выход в интернет по именам.</li>
+        <li>Две беспроводные сети, привязанные к клиентским сегментам, управление точкой — в служебном.</li>
+        <li>Два сайта: внутренний и публичный на разных портах. Публичный доступен снаружи через проброс.</li>
+        <li>Минимальный набор правил: клиенты в интернет и к внутреннему сайту, администратор ко всему, в DMZ входящих правил нет, на внешнем интерфейсе только публикация, трансляция в ручном режиме.</li>
+      </ol>
+
+      <div class="gate">
+        <div class="t">Итоговая самооценка</div>
+        <label><input type="checkbox" data-k="x1"><span>Собрал полностью без подсказок</span></label>
+        <label><input type="checkbox" data-k="x2"><span>Уложился в норматив по времени</span></label>
+        <label><input type="checkbox" data-k="x3"><span>Могу объяснить назначение каждой введённой строки</span></label>
+        <label><input type="checkbox" data-k="x4"><span>Каждую поломку локализовал за пять минут</span></label>
+        <label><input type="checkbox" data-k="x5"><span>Отчёт собран по ходу, а не в конце</span></label>
+      </div>
+
+      <h3>Журнал ошибок</h3>
+      <p>Заводится отдельным файлом и заполняется по ходу. Через несколько проходов он становится полезнее любого чужого руководства, потому что содержит ровно твои слабые места.</p>
+      <div class="tw"><table>
+        <thead><tr><th>Дата</th><th>Симптом</th><th>Сколько искал</th><th>Настоящая причина</th><th>Что мешало найти</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">08.09</td><td>SSH до сервера в DMZ отваливается по таймауту</td><td class="mono">40 мин</td><td>Пакет уходил через Wi-Fi с клиентского адреса, а не с административного</td><td>Смотрел правила firewall, а не выбор интерфейса на своей машине</td></tr>
+          <tr><td class="mono">—</td><td></td><td class="mono">—</td><td></td><td></td></tr>
+          <tr><td class="mono">—</td><td></td><td class="mono">—</td><td></td><td></td></tr>
+        </tbody>
+      </table></div>
+      <p class="note">Последняя колонка важнее остальных. Причина поломки — частный случай, а вот привычка смотреть не туда повторяется и стоит дороже всего.</p>
+
+      <h3>График повторений</h3>
+      <p>Чтобы не выветрилось: карточки через день, через три дня, через неделю, через три недели. Полный прогон стенда — через неделю после первого раза и ещё раз через месяц, каждый раз с новой вариацией из раздела 7.</p>
+    </section>
+
+    <footer>
+      Личное руководство по сборке сетевого стенда. Принципы вендоронезависимы; примеры команд приведены для распространённых платформ и требуют сверки с документацией конкретной прошивки.
+    </footer>
+  </main>
+</div>
+
+<script>
+(function(){
+  var KEY = "netguide-progress-v1";
+  var boxes = Array.prototype.slice.call(document.querySelectorAll('input[type=checkbox][data-k]'));
+  var barEl = document.getElementById('progBar');
+  var txtEl = document.getElementById('progTxt');
+
+  function load(){
+    try { return JSON.parse(localStorage.getItem(KEY) || "{}"); }
+    catch(e){ return {}; }
+  }
+  function save(state){
+    try { localStorage.setItem(KEY, JSON.stringify(state)); } catch(e){}
+  }
+  function paint(){
+    var done = boxes.filter(function(b){ return b.checked; }).length;
+    var pct = boxes.length ? Math.round(done / boxes.length * 100) : 0;
+    barEl.style.width = pct + "%";
+    txtEl.textContent = "Отмечено " + done + " из " + boxes.length;
+  }
+
+  var state = load();
+  boxes.forEach(function(b){
+    if (state[b.dataset.k]) b.checked = true;
+    b.addEventListener('change', function(){
+      var s = load();
+      if (b.checked) s[b.dataset.k] = 1; else delete s[b.dataset.k];
+      save(s); paint();
+    });
+  });
+  paint();
+
+  document.getElementById('resetBtn').addEventListener('click', function(){
+    boxes.forEach(function(b){ b.checked = false; });
+    save({}); paint();
+  });
+
+  var hideBtn = document.getElementById('hideBtn');
+  hideBtn.addEventListener('click', function(){
+    var on = document.body.classList.toggle('hide-cmd');
+    hideBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    hideBtn.textContent = on ? 'Показать команды' : 'Скрыть команды';
+  });
+
+  var links = Array.prototype.slice.call(document.querySelectorAll('.rail a'));
+  var secs = links.map(function(a){ return document.querySelector(a.getAttribute('href')); });
+  function mark(){
+    var y = window.scrollY + 120, cur = 0;
+    secs.forEach(function(s, i){ if (s && s.offsetTop <= y) cur = i; });
+    links.forEach(function(a, i){ a.classList.toggle('on', i === cur); });
+  }
+  window.addEventListener('scroll', mark, { passive: true });
+  mark();
+})();
+</script>
+
+</body>
+</html>
