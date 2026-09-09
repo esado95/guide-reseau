@@ -280,6 +280,7 @@ footer{border-top:1px solid var(--rule); margin-top:60px; padding:22px 0 0;
     <a href="#m9"><i>9</i>Карточки</a>
     <a href="#m10"><i>10</i>Экзамен</a>
     <a href="#m11"><i>11</i>Разбор прогона</a>
+    <a href="#m12"><i>12</i>Тренаж защиты</a>
     <div class="rail-prog">
       <span id="progTxt">Отмечено 0 из 0</span>
       <div class="bar"><i id="progBar"></i></div>
@@ -296,6 +297,7 @@ footer{border-top:1px solid var(--rule); margin-top:60px; padding:22px 0 0;
         <div><b>3</b>дня по регламенту</div>
         <div><b>18</b>тренировочных поломок</div>
         <div><b>1</b>разбор реального прогона</div>
+        <div><b>32</b>вопроса на защите</div>
         <div><b>60</b>карточек самопроверки</div>
       </div>
     </div>
@@ -1371,6 +1373,251 @@ systemctl reload apache2</pre>
         <li><strong>Публикацию проверять только снаружи.</strong> Изнутри запрос может пойти другим путём и создать ложную уверенность.</li>
         <li><strong>Вести журнал ошибок.</strong> Случай с двумя шлюзами повторится в другом виде. Запись о нём полезнее, чем память о конкретной команде.</li>
       </ul>
+    </section>
+
+    <!-- ============ 12 ============ -->
+    <section id="m12">
+      <div class="sec-h"><span class="sec-n">12</span><h2>Тренаж защиты</h2></div>
+      <p class="sec-lede">Тридцать два вопроса, которые задаёт комиссия. Ответ по-французски — его можно произнести как есть. Под ним по-русски: что на самом деле проверяют этим вопросом.</p>
+
+      <p>Работай так: читаешь вопрос, отвечаешь вслух по-французски, и только потом раскрываешь. Если ответ совпал по смыслу — хорошо, дословно совпадать не обязательно. Если не нашёл слов — это и есть твоя слабая точка, отметь её.</p>
+
+      <div class="def">
+        <div class="t">Структура любого ответа</div>
+        <p>Три части, в этом порядке: <strong>что сделал → почему именно так → чем доказано</strong>. Третья часть отличает уверенный ответ от заученного: ты не просто утверждаешь, а называешь проверку, которая это подтверждает.</p>
+      </div>
+
+      <div class="trap">
+        <div class="t">Чего не делать</div>
+        <p>Не начинай с команд. «J'ai tapé <code>ip routing</code>» — плохой ответ, он показывает память, а не понимание. Начинай с задачи: «Il fallait que les VLAN communiquent entre eux, donc…». Команда идёт в конце, как деталь.</p>
+      </div>
+
+      <h3>Общие вопросы об архитектуре</h3>
+      <div class="cards">
+        <details class="card"><summary>Présentez votre infrastructure en deux minutes.</summary><div class="a">
+          <p><strong>Réponse.</strong> Le réseau est segmenté en quatre VLAN : deux pour les clients, un pour le serveur DNS, un pour l'administration. Le routage entre ces VLAN est assuré par un commutateur de niveau 3, qui distribue aussi les adresses aux clients. Une liaison point à point relie ce commutateur au pare-feu pfSense, qui possède trois interfaces : le réseau de la salle, le réseau interne et une DMZ. Dans la DMZ se trouve un serveur Debian avec deux sites Apache : un site interne sur le port 80 et un site public sur le port 8080, publié vers l'extérieur par une redirection de port.</p>
+          <p><strong>По-русски.</strong> Проверяют, держишь ли ты картину целиком. Отвечай сверху вниз: сегментация → маршрутизация → выход наружу → публикация. Не углубляйся в детали, их спросят отдельно.</p>
+        </div></details>
+
+        <details class="card"><summary>Pourquoi avoir segmenté le réseau en VLAN ?</summary><div class="a">
+          <p><strong>Réponse.</strong> Pour trois raisons. D'abord isoler les groupes d'utilisateurs les uns des autres. Ensuite limiter le trafic de diffusion, qui reste confiné dans son VLAN. Enfin, et c'est le plus important, la segmentation est ce qui rend le filtrage possible : tant que tout le monde est dans le même segment, aucun pare-feu ne peut s'interposer.</p>
+          <p><strong>По-русски.</strong> Слабый ответ — «для безопасности». Сильный называет механизм: без сегментации политику применить не к чему, трафик до firewall просто не доходит.</p>
+        </div></details>
+
+        <details class="card"><summary>Qui assure le routage entre les VLAN, et pourquoi ce choix ?</summary><div class="a">
+          <p><strong>Réponse.</strong> Le commutateur de niveau 3. Chaque VLAN possède une interface virtuelle, le SVI, qui sert de passerelle par défaut aux machines de ce VLAN. Ce choix est le plus rapide : le routage est fait en matériel, au plus près des postes. Les alternatives seraient un routeur avec des sous-interfaces, ou le pare-feu lui-même — mais dans les deux cas tout le trafic inter-VLAN traverserait une seule liaison.</p>
+          <p><strong>По-русски.</strong> Здесь ждут, что ты знаешь три способа и можешь сравнить. Назови все три и обоснуй выбор.</p>
+        </div></details>
+
+        <details class="card"><summary>Qu'est-ce qu'une DMZ et pourquoi le serveur web s'y trouve-t-il ?</summary><div class="a">
+          <p><strong>Réponse.</strong> Une DMZ est un segment réservé aux services exposés vers l'extérieur. L'idée est qu'un serveur compromis ne donne pas accès au réseau interne. C'est pour cela qu'aucune règle n'autorise la DMZ à initier une connexion : le serveur répond aux demandes entrantes, mais ne peut rien joindre de lui-même.</p>
+          <p><strong>По-русски.</strong> Проверяют, понимаешь ли ты смысл, а не название. Ключ — «сервер только отвечает, сам никуда не ходит».</p>
+        </div></details>
+
+        <details class="card"><summary>Expliquez votre plan d'adressage. Pourquoi des masques différents ?</summary><div class="a">
+          <p><strong>Réponse.</strong> Le masque est choisi selon le nombre de machines attendues. Les réseaux clients sont en /24 parce qu'ils doivent accueillir beaucoup de postes. Le VLAN d'administration est en /28, soit quatorze adresses utilisables, ce qui suffit largement. Le VLAN du serveur DNS est en /29, six adresses. La liaison entre le pare-feu et le serveur web est en /30 : exactement deux adresses, c'est une liaison point à point.</p>
+          <p><strong>По-русски.</strong> Могут попросить посчитать вслух. Помни: из общего числа адресов всегда вычитаются два — адрес сети и широковещательный.</p>
+        </div></details>
+      </div>
+
+      <h3>Коммутатор</h3>
+      <div class="cards">
+        <details class="card"><summary>Quelle est la différence entre un port en mode access et un port en mode trunk ?</summary><div class="a">
+          <p><strong>Réponse.</strong> Un port access appartient à un seul VLAN et transmet les trames sans étiquette : la machine connectée ignore l'existence des VLAN. Un port trunk transporte plusieurs VLAN sur le même lien physique, et chaque trame reçoit une étiquette 802.1Q qui indique son VLAN. On utilise un trunk vers un autre commutateur, un hyperviseur ou un point d'accès.</p>
+          <p><strong>По-русски.</strong> Базовый вопрос, но на нём часто плывут. Обязательно назови тег 802.1Q — без него ответ неполный.</p>
+        </div></details>
+
+        <details class="card"><summary>Qu'est-ce qu'un SVI ?</summary><div class="a">
+          <p><strong>Réponse.</strong> C'est une interface virtuelle de VLAN sur le commutateur. On lui attribue une adresse IP, et cette adresse devient la passerelle par défaut des machines du VLAN. C'est par les SVI que le commutateur de niveau 3 route le trafic d'un VLAN vers un autre.</p>
+          <p><strong>По-русски.</strong> Односложно: виртуальный интерфейс VLAN с IP-адресом, он же шлюз для этого VLAN.</p>
+        </div></details>
+
+        <details class="card"><summary>Vous avez créé les SVI, mais rien ne passe entre les VLAN. Pourquoi ?</summary><div class="a">
+          <p><strong>Réponse.</strong> Parce que la fonction de routage n'est pas activée par défaut sur le commutateur. Sans elle, les SVI existent, sont actifs, ont une adresse — mais le commutateur ne route rien. Le symptôme est caractéristique : chaque machine joint sa propre passerelle, mais aucune ne joint un autre VLAN.</p>
+          <p><strong>По-русски.</strong> Любимый вопрос-ловушка. Главное — назвать симптом «свой шлюз да, чужой нет», это доказывает, что ты это видел, а не читал.</p>
+        </div></details>
+
+        <details class="card"><summary>Pourquoi le port vers le pare-feu n'est-il pas dans un VLAN ?</summary><div class="a">
+          <p><strong>Réponse.</strong> Parce qu'il s'agit d'une liaison routée point à point. La commande <code>no switchport</code> transforme ce port en port de routeur : il quitte le monde des VLAN et reçoit sa propre adresse IP. C'est plus simple qu'un VLAN de transit, et cela évite d'étendre un domaine de diffusion jusqu'au pare-feu.</p>
+          <p><strong>По-русски.</strong> Могут спросить «а можно было через VLAN?» Да, можно, но точка-точка проще и чище.</p>
+        </div></details>
+
+        <details class="card"><summary>Pourquoi avoir limité la liste des VLAN autorisés sur les trunks ?</summary><div class="a">
+          <p><strong>Réponse.</strong> Pour que chaque équipement ne reçoive que les segments dont il a besoin. Le point d'accès reçoit les VLAN clients et le VLAN d'administration, l'hyperviseur reçoit ceux de ses machines virtuelles. Tout VLAN supplémentaire serait à la fois du trafic de diffusion inutile et un chemin possible vers un segment interdit.</p>
+          <p><strong>По-русски.</strong> Ответ «чтобы было аккуратно» слабый. Назови обе причины: лишнее широковещание и лишняя дорожка.</p>
+        </div></details>
+
+        <details class="card"><summary>Qu'est-ce que le VLAN natif, et pourquoi l'avoir déplacé ?</summary><div class="a">
+          <p><strong>Réponse.</strong> Le VLAN natif est celui dont les trames circulent sur le trunk sans étiquette. Par défaut c'est le VLAN 1. Je l'ai déplacé vers un VLAN dédié et inutilisé pour que toute trame non étiquetée tombe dans un segment vide. Cela neutralise l'attaque par double étiquetage et évite qu'un trafic imprévu se retrouve dans un réseau de production.</p>
+          <p><strong>По-русски.</strong> Если знаешь термин «double tagging» — назови, это сразу поднимает уровень ответа.</p>
+        </div></details>
+      </div>
+
+      <h3>Адресация и имена</h3>
+      <div class="cards">
+        <details class="card"><summary>Pourquoi le service DHCP est-il sur le commutateur et non sur le pare-feu ?</summary><div class="a">
+          <p><strong>Réponse.</strong> Parce que la demande d'adresse est une trame de diffusion, et une diffusion ne sort pas de son VLAN. Le commutateur est déjà la passerelle de chaque VLAN, donc il se trouve à l'intérieur de chaque domaine de diffusion et reçoit la demande directement. C'était aussi une exigence du cahier des charges.</p>
+          <p><strong>По-русски.</strong> Начни с механизма, а не с «так требовалось». Требование потом, как подтверждение.</p>
+        </div></details>
+
+        <details class="card"><summary>Et si le serveur DHCP était dans un autre VLAN ?</summary><div class="a">
+          <p><strong>Réponse.</strong> Il faudrait activer le relais DHCP sur la passerelle de chaque VLAN client. Le relais transforme la demande de diffusion en une demande unicast adressée au serveur. Cela fonctionne, mais ajoute un maillon supplémentaire et donc un point de panne de plus.</p>
+          <p><strong>По-русски.</strong> Проверка глубины. Термин по-французски — <em>relais DHCP</em>, у Cisco команда <code>ip helper-address</code>.</p>
+        </div></details>
+
+        <details class="card"><summary>Quels paramètres distribuez-vous en plus de l'adresse ?</summary><div class="a">
+          <p><strong>Réponse.</strong> Le masque, la passerelle par défaut, l'adresse du serveur DNS et le suffixe DNS du domaine interne. J'exclus aussi les vingt premières adresses de chaque plage, réservées aux attributions fixes.</p>
+          <p><strong>По-русски.</strong> Четыре параметра плюс исключения. Забыть суффикс — типовая ошибка, о которой спросят следующим вопросом.</p>
+        </div></details>
+
+        <details class="card"><summary>À quoi sert le suffixe DNS distribué par le DHCP ?</summary><div class="a">
+          <p><strong>Réponse.</strong> Il permet aux clients d'utiliser des noms courts. Sans suffixe, la machine ne sait pas quoi ajouter à <code>web</code> et la résolution échoue, alors que <code>web.abu</code> fonctionne. C'est exactement le symptôme : le nom complet répond, le nom court non.</p>
+          <p><strong>По-русски.</strong> Назови симптом — это показывает, что ты понимаешь, а не пересказываешь.</p>
+        </div></details>
+
+        <details class="card"><summary>À quoi servent les redirecteurs sur le serveur DNS ?</summary><div class="a">
+          <p><strong>Réponse.</strong> Le serveur interne fait autorité uniquement sur la zone interne. Pour tout le reste, il transmet la question à des serveurs publics. Sans redirecteurs, les clients résoudraient les noms internes mais aucun nom d'Internet.</p>
+          <p><strong>По-русски.</strong> Ключевое слово по-французски — <em>redirecteurs</em>. Симптом: внутренние имена работают, внешние нет.</p>
+        </div></details>
+      </div>
+
+      <h3>Маршрутизация и трансляция адресов</h3>
+      <div class="cards">
+        <details class="card"><summary>Pourquoi avoir déclaré des routes statiques sur le pare-feu ?</summary><div class="a">
+          <p><strong>Réponse.</strong> Le pare-feu ne connaît que ses réseaux directement connectés. Les quatre réseaux internes se trouvent derrière le commutateur de niveau 3, donc j'ai déclaré une route par réseau, pointant vers l'adresse de transit du commutateur. C'est le chemin de retour : sans lui, les demandes partent mais les réponses ne reviennent pas.</p>
+          <p><strong>По-русски.</strong> Обязательно скажи «chemin de retour» — обратный путь. Это показывает, что ты мыслишь симметрией.</p>
+        </div></details>
+
+        <details class="card"><summary>Pourquoi la passerelle par défaut n'est-elle déclarée que sur l'interface WAN ?</summary><div class="a">
+          <p><strong>Réponse.</strong> Parce que la passerelle par défaut répond à la question « où envoyer ce que je ne connais pas », et cette réponse ne peut être qu'unique. La déclarer sur deux interfaces rendrait le choix du chemin imprévisible.</p>
+          <p><strong>По-русски.</strong> Коротко и уверенно. Один выход наружу — один шлюз по умолчанию.</p>
+        </div></details>
+
+        <details class="card"><summary>Quelle est la différence entre le NAT sortant et la redirection de port ?</summary><div class="a">
+          <p><strong>Réponse.</strong> Le NAT sortant remplace l'adresse source quand le trafic part vers l'extérieur : les adresses privées ne sont pas routables sur Internet, donc le pare-feu met la sienne à la place. La redirection de port fait l'inverse, à l'entrée : elle remplace l'adresse et le port de destination pour amener une demande venue de l'extérieur vers un serveur interne.</p>
+          <p><strong>По-русски.</strong> Формулируй через направление: исходящий меняет источник, входящий меняет назначение.</p>
+        </div></details>
+
+        <details class="card"><summary>Pourquoi avoir choisi le NAT manuel plutôt qu'automatique ?</summary><div class="a">
+          <p><strong>Réponse.</strong> Parce qu'en mode manuel la liste des réseaux qui sortent est explicite. En mode automatique, un nouveau réseau obtiendrait un accès à Internet du simple fait d'exister, sans décision de ma part. C'était aussi une exigence du sujet.</p>
+          <p><strong>По-русски.</strong> Ответ «потому что так требовали» — половина ответа. Первая половина: явный контроль над тем, кто выходит наружу.</p>
+        </div></details>
+
+        <details class="card"><summary>Pourquoi la DMZ n'est-elle pas traduite ?</summary><div class="a">
+          <p><strong>Réponse.</strong> Parce que le serveur web n'a aucun besoin d'aller sur Internet : il répond aux demandes entrantes. Ne pas le traduire ajoute une barrière si le serveur venait à être compromis.</p>
+          <p><strong>По-русски.</strong> Это вопрос «а почему не все сети?». Ответ — по необходимости, а не по привычке.</p>
+        </div></details>
+
+        <details class="card"><summary>Le pare-feu lui-même a-t-il besoin de NAT ?</summary><div class="a">
+          <p><strong>Réponse.</strong> Non. Il émet déjà ses paquets avec l'adresse de son interface WAN, qui est routable en amont. Le NAT ne concerne que les réseaux situés derrière lui.</p>
+          <p><strong>По-русски.</strong> Каверзный вопрос. Многие на автомате добавляют правило для самого firewall — и не могут объяснить зачем.</p>
+        </div></details>
+
+        <details class="card"><summary>Pourquoi avoir désactivé le blocage des réseaux privés sur le WAN ?</summary><div class="a">
+          <p><strong>Réponse.</strong> Parce que l'interface WAN est elle-même adressée dans une plage privée : c'est le réseau de la salle de formation. Si je laissais l'option active, le pare-feu bloquerait son propre réseau de sortie. En production, face à un vrai fournisseur d'accès, cette option resterait activée.</p>
+          <p><strong>По-русски.</strong> Обязательно добавь последнюю фразу про продакшн. Без неё выглядит как ослабление защиты, с ней — как осознанное решение под условия стенда.</p>
+        </div></details>
+      </div>
+
+      <h3>Фильтрация</h3>
+      <div class="cards">
+        <details class="card"><summary>Qu'est-ce qu'un pare-feu à état, et quelle conséquence pratique ?</summary><div class="a">
+          <p><strong>Réponse.</strong> Il mémorise les connexions établies dans une table d'états. Conséquence pratique : quand j'autorise une demande vers l'extérieur, la réponse revient automatiquement. Il n'y a pas besoin d'écrire de règle de retour, et il ne faut surtout pas en écrire.</p>
+          <p><strong>По-русски.</strong> Термин — <em>pare-feu à état</em>. Вывод про отсутствие обратных правил и есть то, что проверяют.</p>
+        </div></details>
+
+        <details class="card"><summary>Dans quel ordre les règles sont-elles évaluées ?</summary><div class="a">
+          <p><strong>Réponse.</strong> De haut en bas, et c'est la première correspondance qui l'emporte : la suite n'est pas examinée. À la fin de la liste il y a un refus implicite — tout ce qui n'est pas explicitement autorisé est interdit.</p>
+          <p><strong>По-русски.</strong> Два факта в одном ответе: первое совпадение и неявный запрет.</p>
+        </div></details>
+
+        <details class="card"><summary>Pourquoi la règle vers le site interne est-elle placée avant le blocage des réseaux privés ?</summary><div class="a">
+          <p><strong>Réponse.</strong> Parce que le serveur web se trouve lui-même dans une plage privée. Si le blocage était placé avant, il couperait aussi l'accès au site interne. En inversant ces deux lignes, le site interne devient inaccessible alors qu'Internet continue de fonctionner.</p>
+          <p><strong>По-русски.</strong> Лучший вопрос, чтобы показать понимание порядка. Отвечай через последствие: что именно сломается.</p>
+        </div></details>
+
+        <details class="card"><summary>Pourquoi les postes clients ne peuvent-ils plus faire de ping vers Internet ?</summary><div class="a">
+          <p><strong>Réponse.</strong> Parce que le sujet demandait les règles les plus restrictives possibles. Les clients ont besoin du web, donc j'autorise les ports 80 et 443, et rien d'autre. L'ICMP n'est pas nécessaire à leur usage. L'administrateur, lui, conserve un accès complet, ICMP compris, comme le sujet l'exige.</p>
+          <p><strong>По-русски.</strong> Это не недоработка, а осознанное решение. Обязательно противопоставь админу — тогда видно, что политика избирательная.</p>
+        </div></details>
+
+        <details class="card"><summary>Pourquoi n'y a-t-il aucune règle sur l'interface DMZ ?</summary><div class="a">
+          <p><strong>Réponse.</strong> Parce que le serveur n'a besoin d'initier aucune connexion. Les demandes qui viennent des clients ou de l'extérieur sont déjà suivies par la table d'états, et les réponses passent sans règle. Une interface sans règle signifie donc : rien ne part d'ici.</p>
+          <p><strong>По-русски.</strong> Могут поймать: «а как тогда сайт отвечает?». Ответ — через таблицу состояний.</p>
+        </div></details>
+
+        <details class="card"><summary>Qu'est-ce que la règle anti-blocage, et pourquoi l'avoir désactivée ?</summary><div class="a">
+          <p><strong>Réponse.</strong> C'est une règle intégrée qui laisse n'importe quelle source du réseau interne joindre le pare-feu sur les ports d'administration. Elle est évaluée avant mes règles, donc tant qu'elle est active, mon interdiction faite aux clients n'a aucun effet. Je l'ai désactivée, mais seulement après avoir écrit et vérifié un accès explicite pour le VLAN d'administration.</p>
+          <p><strong>По-русски.</strong> Сильный ответ: не просто «отключил», а «отключил после того, как обеспечил себе доступ». Это показывает методичность.</p>
+        </div></details>
+      </div>
+
+      <h3>Проверки и каверзные вопросы</h3>
+      <div class="cards">
+        <details class="card"><summary>Comment prouvez-vous que le site public est accessible depuis la salle ?</summary><div class="a">
+          <p><strong>Réponse.</strong> En y accédant depuis une machine du réseau de la salle, pas depuis l'intérieur. La capture montre l'adresse du WAN dans la barre du navigateur et la page servie. Tester depuis l'intérieur ne prouverait rien : la demande pourrait emprunter un autre chemin et contourner la redirection.</p>
+          <p><strong>По-русски.</strong> Тут проверяют методику доказательства. Фраза «depuis l'intérieur ne prouverait rien» — самая ценная в ответе.</p>
+        </div></details>
+
+        <details class="card"><summary>Un client ne reçoit pas d'adresse IP. Comment procédez-vous ?</summary><div class="a">
+          <p><strong>Réponse.</strong> Je remonte les couches. D'abord le port : est-il dans le bon VLAN, le lien est-il actif ? Ensuite le trunk : le VLAN est-il autorisé jusqu'à l'équipement ? Ensuite le service : la plage existe-t-elle, reste-t-il des adresses libres ? Enfin la table des baux, pour voir si une demande est arrivée.</p>
+          <p><strong>По-русски.</strong> Проверяют метод, а не знание. Отвечай слоями снизу вверх и не называй сразу причину.</p>
+        </div></details>
+
+        <details class="card"><summary>Vous ajoutez une règle, mais le comportement ne change pas. Pourquoi ?</summary><div class="a">
+          <p><strong>Réponse.</strong> Deux causes possibles. Soit une connexion établie avant la modification survit dans la table d'états, et il faut attendre son expiration ou la supprimer. Soit une règle placée plus haut correspond déjà au trafic et l'emporte. Les compteurs de correspondance permettent de trancher.</p>
+          <p><strong>По-русски.</strong> Назвать компетентно обе причины плюс способ различить — сильный ответ.</p>
+        </div></details>
+
+        <details class="card"><summary>Le pare-feu ne répond pas au ping. Est-il en panne ?</summary><div class="a">
+          <p><strong>Réponse.</strong> Pas nécessairement. Le ping teste uniquement l'ICMP, qui peut être filtré. Il faut tester le service attendu : si le port d'administration répond, l'équipement fonctionne. Conclure à une panne à partir d'un seul ping est une erreur classique.</p>
+          <p><strong>По-русски.</strong> Классическая ловушка. Ответ показывает, что ты различаешь протокол и доступность узла.</p>
+        </div></details>
+
+        <details class="card"><summary>Pourquoi avoir masqué les empreintes de mots de passe dans le rapport ?</summary><div class="a">
+          <p><strong>Réponse.</strong> Parce que ce sont des condensats cassables par force brute. Les publier dans un document remis annulerait une partie du travail de sécurisation décrit dans ce même document.</p>
+          <p><strong>По-русски.</strong> Вопрос на зрелость. Ответ показывает, что ты думаешь о документе как о носителе риска.</p>
+        </div></details>
+
+        <details class="card"><summary>Qu'amélioreriez-vous avec plus de temps ?</summary><div class="a">
+          <p><strong>Réponse.</strong> Trois choses. Passer les deux sites en HTTPS avec des certificats. Mettre en place une supervision et une centralisation des journaux, pour détecter un incident sans le chercher à la main. Et automatiser la sauvegarde des configurations, aujourd'hui faite manuellement.</p>
+          <p><strong>По-русски.</strong> Никогда не отвечай «ничего». Три конкретных пункта показывают, что ты видишь границы своей работы. Не называй то, что требовалось и не сделано — только то, что сверх задания.</p>
+        </div></details>
+      </div>
+
+      <h3>Словарь для устного ответа</h3>
+      <p>Слова, на которых чаще всего спотыкаются. Если термин не вспомнится, ответ рассыплется, даже когда суть понятна.</p>
+      <div class="tw"><table>
+        <thead><tr><th>Français</th><th>Русский</th></tr></thead>
+        <tbody>
+          <tr><td>la trame / le paquet</td><td>кадр / пакет</td></tr>
+          <tr><td>l'étiquette 802.1Q</td><td>тег 802.1Q</td></tr>
+          <tr><td>le domaine de diffusion</td><td>широковещательный домен</td></tr>
+          <tr><td>la passerelle par défaut</td><td>шлюз по умолчанию</td></tr>
+          <tr><td>la table de routage</td><td>таблица маршрутизации</td></tr>
+          <tr><td>le chemin de retour</td><td>обратный путь</td></tr>
+          <tr><td>le bail DHCP</td><td>аренда адреса</td></tr>
+          <tr><td>le relais DHCP</td><td>ретрансляция DHCP</td></tr>
+          <tr><td>les redirecteurs</td><td>серверы пересылки DNS</td></tr>
+          <tr><td>le pare-feu à état</td><td>межсетевой экран с учётом состояний</td></tr>
+          <tr><td>la table d'états</td><td>таблица состояний</td></tr>
+          <tr><td>le refus implicite</td><td>неявный запрет</td></tr>
+          <tr><td>la première correspondance</td><td>первое совпадение</td></tr>
+          <tr><td>le NAT sortant</td><td>исходящая трансляция адресов</td></tr>
+          <tr><td>la redirection de port</td><td>проброс порта</td></tr>
+          <tr><td>le condensat / l'empreinte</td><td>хэш</td></tr>
+          <tr><td>l'attaque par double étiquetage</td><td>атака с двойным тегированием</td></tr>
+        </tbody>
+      </table></div>
+
+      <div class="gate">
+        <div class="t">Готовность к защите</div>
+        <label><input type="checkbox" data-k="d1"><span>Отвечаю на все вопросы вслух, не подглядывая</span></label>
+        <label><input type="checkbox" data-k="d2"><span>Каждый ответ строю как «что сделал → почему → чем доказано»</span></label>
+        <label><input type="checkbox" data-k="d3"><span>Знаю все термины из словаря и произношу без запинки</span></label>
+        <label><input type="checkbox" data-k="d4"><span>Могу показать в отчёте страницу под любое своё утверждение</span></label>
+        <label><input type="checkbox" data-k="d5"><span>Готов ответ на «что бы улучшили» — три конкретных пункта</span></label>
+      </div>
     </section>
 
     <footer>
